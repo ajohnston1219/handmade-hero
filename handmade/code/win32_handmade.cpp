@@ -12,6 +12,6 @@ int WINAPI wWinMain(HINSTANCE hInstance,
                     int       nCmdShow)
 {
     MessageBoxA(0, "Hey, fucker!", "FUCK YOU",
-                MB_OK | MB_ICONINFORMATION);
+                MB_OK|MB_ICONINFORMATION);
     return 0;
 }
