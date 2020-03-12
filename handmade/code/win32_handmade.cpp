@@ -28,6 +28,46 @@ global_variable int BitmapWidth;
 global_variable int BitmapHeight;
 
 /*
+ * Paint gradient
+ */
+internal void RenderWeirdGradient(int XOffset,
+                                  int YOffset)
+{
+    int BytesPerPixel = 4;
+    int Pitch = BitmapWidth * BytesPerPixel;
+    uint8 *Row = (uint8 *)BitmapMemory;
+    for(int Y = 0; Y < BitmapHeight; ++Y)
+    {
+        uint8 *Pixel = (uint8 *)Row;
+        for (int X = 0; X < BitmapWidth; ++X)
+        {
+            /*
+            Little endian architecture so bytes are reversed
+            Actual memory:   xx RR GG BB
+            Pixel in memory: BB GG RR XX
+            */
+            // Blue
+            *Pixel = (uint8)(X + XOffset);
+            ++Pixel;
+
+            // Green
+            *Pixel = (uint8)(Y + YOffset);
+            ++Pixel;
+
+            // Red
+            *Pixel = 0;
+            ++Pixel;
+
+            // Pad
+            *Pixel = 0;
+            ++Pixel;
+        }
+
+        Row += Pitch;
+    }
+}
+
+/*
  * Resize bitmap
  */
 internal void Win32ResizeDIBSection(int Width,
@@ -60,37 +100,7 @@ internal void Win32ResizeDIBSection(int Width,
     int BitmapMemorySize = BytesPerPixel * BitmapWidth * BitmapHeight;
     BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 
-    int Pitch = Width * BytesPerPixel;
-    uint8 *Row = (uint8 *)BitmapMemory;
-    for(int Y = 0; Y < BitmapHeight; ++Y)
-    {
-        uint8 *Pixel = (uint8 *)Row;
-        for (int X = 0; X < BitmapWidth; ++X)
-        {
-            /*
-              Little endian architecture so bytes are reversed
-              Actual memory:   xx RR GG BB
-              Pixel in memory: BB GG RR XX
-            */
-            // Blue
-            *Pixel = (uint8)X;
-            ++Pixel;
-
-            // Green
-            *Pixel = (uint8)Y;
-            ++Pixel;
-
-            // Red
-            *Pixel = 0;
-            ++Pixel;
-
-            // Pad
-            *Pixel = 0;
-            ++Pixel;
-        }
-
-        Row += Pitch;
-    }
+    // TODO(adam): Probably clear this to black
 }
 
 /*
@@ -206,7 +216,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
      */
     if (RegisterClass(&WindowClass))
     {
-        HWND WindowHandle =
+        HWND Window =
             CreateWindowExA(
                 0,
                 WindowClass.lpszClassName,
@@ -223,22 +233,37 @@ int WINAPI wWinMain(HINSTANCE Instance,
         /*
          * If successful, loop through messages
          */
-        if (WindowHandle)
+        if (Window)
         {
             Running = true;
+            int XOffset = 0;
+            int YOffset = 0;
             while (Running)
             {
                 MSG Message;
-                BOOL MessageResult = GetMessageA(&Message, 0, 0, 0);
-                if (MessageResult > 0)
+                // vvv Blocks
+                // BOOL MessageResult = GetMessageA(&Message, 0, 0, 0);
+                while (PeekMessageA(&Message, 0, 0, 0, PM_REMOVE))
                 {
+                    if (Message.message == WM_QUIT)
+                    {
+                        Running = false;
+                    }
                     TranslateMessage(&Message);
                     DispatchMessageA(&Message);
                 }
-                else
-                {
-                    break;
-                }
+
+                RenderWeirdGradient(XOffset, YOffset);
+
+                HDC DeviceContext = GetDC(Window);
+                RECT ClientRect;
+                GetClientRect(Window, &ClientRect);
+                int WindowWidth = ClientRect.right - ClientRect.left;
+                int WindowHeight = ClientRect.bottom - ClientRect.top;
+                Win32UpdateWindow(DeviceContext, &ClientRect, 0, 0, WindowWidth, WindowHeight);
+                ReleaseDC(Window, DeviceContext);
+
+                ++XOffset;
             }
         }
         // Failed to create window
