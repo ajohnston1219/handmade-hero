@@ -3,8 +3,14 @@
 // Author: Adam Johnston //
 // Created: 3/12/2020    //
 ///////////////////////////
-
 #include <windows.h>
+
+#define local_persist static
+#define global_variable static
+#define internal static
+
+// TODO(adam): This is a global for now
+global_variable bool Running;
 
 LRESULT CALLBACK MainWindowCallback(HWND   Window,
                                     UINT   Message,
@@ -22,12 +28,14 @@ LRESULT CALLBACK MainWindowCallback(HWND   Window,
 
         case WM_DESTROY:
         {
-            OutputDebugStringA("WM_DESTROY\n");
+            // TODO(adam): Handle this with error - recreate window?
+            Running = false;
         } break;
 
         case WM_CLOSE:
         {
-            OutputDebugStringA("WM_CLOSE\n");
+            // TODO(adam): Handle this with message to user?
+            Running = false;
         } break;
 
         case WM_ACTIVATEAPP:
@@ -43,7 +51,7 @@ LRESULT CALLBACK MainWindowCallback(HWND   Window,
             int Y = Paint.rcPaint.top;
             int Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
             int Width = Paint.rcPaint.right - Paint.rcPaint.left;
-            static DWORD Operation = WHITENESS;
+            local_persist DWORD Operation = WHITENESS;
             PatBlt(DeviceContext, X, Y, Width, Height, Operation);
             if (Operation == WHITENESS)
             {
@@ -76,7 +84,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
      */
     WNDCLASSA WindowClass = {};
     // TODO(adam): Check if HREDRAW/VREDRAW/OWNDC still matter
-    WindowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
     WindowClass.lpfnWndProc = MainWindowCallback;
     WindowClass.hInstance = Instance;
     // WindowClass.hIcon;
@@ -106,14 +113,15 @@ int WINAPI wWinMain(HINSTANCE Instance,
          */
         if (WindowHandle)
         {
-            MSG Message;
-            for(;;)
+            Running = true;
+            while (Running)
             {
-                BOOL MessageResult = GetMessage(&Message, 0, 0, 0);
+                MSG Message;
+                BOOL MessageResult = GetMessageA(&Message, 0, 0, 0);
                 if (MessageResult > 0)
                 {
                     TranslateMessage(&Message);
-                    DispatchMessage(&Message);
+                    DispatchMessageA(&Message);
                 }
                 else
                 {
