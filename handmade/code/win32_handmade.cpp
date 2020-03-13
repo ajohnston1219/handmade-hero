@@ -7,6 +7,7 @@
 
 #include <windows.h>
 #include <stdint.h>
+#include <xinput.h>
 
 #define local_persist   static
 #define global_variable static
@@ -276,6 +277,39 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     }
                     TranslateMessage(&Message);
                     DispatchMessageA(&Message);
+                }
+
+                // TODO(adam): Should we poll this more frequently?
+                for (DWORD ControllerIndex = 0;
+                     ControllerIndex < XUSER_MAX_COUNT;
+                    ++ControllerIndex)
+                {
+                    XINPUT_STATE ControllerState;
+                    if(XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+                    {
+                        // NOTE(adam): This controller is plugged in
+                        // TODO(adam): See if ControllerState.dwPacketNumber increments too rapidly
+                        XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
+
+                        bool  Up            = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+                        bool  Down          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+                        bool  Left          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+                        bool  Right         = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+                        bool  Start         = (Pad->wButtons & XINPUT_GAMEPAD_START);
+                        bool  Back          = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
+                        bool  LeftShoulder  = (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+                        bool  RightShoulder = (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+                        bool  AButton       = (Pad->wButtons & XINPUT_GAMEPAD_A);
+                        bool  BButton       = (Pad->wButtons & XINPUT_GAMEPAD_B);
+                        bool  XButton       = (Pad->wButtons & XINPUT_GAMEPAD_X);
+                        bool  YButton       = (Pad->wButtons & XINPUT_GAMEPAD_Y);
+                        int16 StickX        = Pad->sThumbLX;
+                        int16 StickY        = Pad->sThumbLY;
+                    }
+                    else
+                    {
+                        // NOTE(adam): This controller is not available
+                    }
                 }
 
                 RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
