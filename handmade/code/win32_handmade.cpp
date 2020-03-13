@@ -39,7 +39,7 @@ struct win32_window_dimensions
 };
 
 // TODO(adam): This is a global for now
-global_variable bool                   Running;
+global_variable bool                   GlobalRunning;
 global_variable win32_offscreen_buffer GlobalBackBuffer;
 
 /*
@@ -165,20 +165,16 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
 
     switch(Message)
     {
-        case WM_SIZE:
-        {
-        } break;
-
         case WM_DESTROY:
         {
             // TODO(adam): Handle this with error - recreate window?
-            Running = false;
+            GlobalRunning = false;
         } break;
 
         case WM_CLOSE:
         {
             // TODO(adam): Handle this with message to user?
-            Running = false;
+            GlobalRunning = false;
         } break;
 
         case WM_ACTIVATEAPP:
@@ -260,11 +256,16 @@ int WINAPI wWinMain(HINSTANCE Instance,
          */
         if (Window)
         {
+            // NOTE(adam): Since we specified CS_OWNDC, we can just
+            // get one DC and use it forever because we are not
+            // sharing it
+            HDC DeviceContext = GetDC(Window);
+
             int XOffset = 0;
             int YOffset = 0;
 
-            Running = true;
-            while (Running)
+            GlobalRunning = true;
+            while (GlobalRunning)
             {
                 MSG Message;
                 // vvv Blocks
