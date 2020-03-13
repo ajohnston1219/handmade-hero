@@ -196,8 +196,7 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
                 DeviceContext,
                 Dimension.Width,
                 Dimension.Height,
-                GlobalBackBuffer,
-                X, Y, Width, Height);
+                GlobalBackBuffer);
             EndPaint(Window, &Paint);
         } break;
 
@@ -226,7 +225,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
     Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
-    WindowClass.style = CS_HREDRAW|CS_VREDRAW;
+    WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
     WindowClass.lpfnWndProc = Win32MainWindowCallback;
     WindowClass.hInstance = Instance;
     // WindowClass.hIcon;
@@ -282,17 +281,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                 RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
 
-                HDC DeviceContext = GetDC(Window);
                 win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
                 Win32DisplayBufferInWindow(
                     DeviceContext,
                     Dimension.Width,
                     Dimension.Height,
-                    GlobalBackBuffer,
-                    0, 0,
-                    Dimension.Width,
-                    Dimension.Height);
-                ReleaseDC(Window, DeviceContext);
+                    GlobalBackBuffer);
 
                 ++XOffset;
                 ++YOffset;
