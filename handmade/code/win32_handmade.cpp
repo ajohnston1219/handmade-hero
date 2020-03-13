@@ -82,17 +82,18 @@ internal void Win32LoadXInput()
 /*
  * Paint gradient
  */
-internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
-                                  int                    XOffset,
-                                  int                    YOffset)
+internal void RenderWeirdGradient(win32_offscreen_buffer *Buffer,
+                                  int                     XOffset,
+                                  int                     YOffset,
+                                  int                     RedShift)
 {
     // TODO(adam): See what the optimizer does when we pass Buffer by value
     // NOTE(adam): See Chandler Carruth lectures for optimization (contributor to LLVM)
-    uint8 *Row = (uint8 *)Buffer.Memory;
-    for(int Y = 0; Y < Buffer.Height; ++Y)
+    uint8 *Row = (uint8 *)Buffer->Memory;
+    for(int Y = 0; Y < Buffer->Height; ++Y)
     {
         uint32 *Pixel = (uint32 *)Row;
-        for (int X = 0; X < Buffer.Width; ++X)
+        for (int X = 0; X < Buffer->Width; ++X)
         {
             /*
             Little endian architecture so bytes are reversed
@@ -101,14 +102,14 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
                 Memory:     BB GG RR XX
             */
             // uint8 Red = (X + YOffset) - (Y + XOffset);
-            uint8 Blue = (X + XOffset);
-            uint8 Green = (Y + YOffset);
-            uint8 Red = Blue + Green;
+            uint8 Blue = (X + XOffset) - Y*Y/4;
+            uint8 Green = (Y + YOffset) + X*X/4;
+            uint8 Red = Blue + Green + RedShift + X*Y/4;
 
             *Pixel++ = (uint32)((Red << 16) | (Green << 8) | Blue);
         }
 
-        Row += Buffer.Pitch;
+        Row += Buffer->Pitch;
     }
 }
 
@@ -364,6 +365,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
             int XOffset = 0;
             int YOffset = 0;
+            int RedShift = 100;
 
             GlobalRunning = true;
             bool ControllerFound = false;
@@ -412,10 +414,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         int16 StickX        = Pad->sThumbLX;
                         int16 StickY        = Pad->sThumbLY;
 
-                        if (AButton)
-                        {
-                            YOffset += 2;
-                        }
+                        XOffset -= StickX >> 12;
+                        YOffset += StickY >> 12;
+
+                        if (AButton) { RedShift += 5; }
+                        if (BButton) { RedShift -= 5; }
+
                     }
                     else
                     {
