@@ -38,6 +38,10 @@ struct win32_window_dimensions
     int Height;
 };
 
+// TODO(adam): This is a global for now
+global_variable bool                   GlobalRunning;
+global_variable win32_offscreen_buffer GlobalBackBuffer;
+
 // NOTE(adam): Support for XInputGetState
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
 typedef X_INPUT_GET_STATE(x_input_get_state);
@@ -46,6 +50,7 @@ X_INPUT_GET_STATE(XInputGetStateStub)
     return 0;
 }
 global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+#define XInputGetState XInputGetState_
 
 // NOTE(adam): Support for XInputSetState
 #define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration)
@@ -55,13 +60,18 @@ X_INPUT_SET_STATE(XInputSetStateStub)
     return 0;
 }
 global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
-
-#define XInputGetState XInputGetState_
 #define XInputSetState XInputSetState_
 
-// TODO(adam): This is a global for now
-global_variable bool                   GlobalRunning;
-global_variable win32_offscreen_buffer GlobalBackBuffer;
+internal void Win32LoadXInput()
+{
+    HMODULE XInputLibrary = LoadLibraryA("xinput1_3.dll");
+    if (XInputLibrary)
+    {
+        XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
+        XInputSetState = (x_input_set_state *)GetProcAddress(XInputLibrary, "XInputSetState");
+    }
+}
+
 
 /*
  * Paint gradient
@@ -240,6 +250,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     int       ShowCode)
 {
     /*
+     * Define Xinput functions
+     */
+    Win32LoadXInput();
+
+    /*
      * Define window class
      */
     WNDCLASSA WindowClass = {};
@@ -285,6 +300,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
             int YOffset = 0;
 
             GlobalRunning = true;
+            bool ControllerFound = false;
             while (GlobalRunning)
             {
                 MSG Message;
@@ -310,6 +326,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     {
                         // NOTE(adam): This controller is plugged in
                         // TODO(adam): See if ControllerState.dwPacketNumber increments too rapidly
+
+                        ControllerFound = true;
+
                         XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
 
                         bool  Up            = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
@@ -326,10 +345,20 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         bool  YButton       = (Pad->wButtons & XINPUT_GAMEPAD_Y);
                         int16 StickX        = Pad->sThumbLX;
                         int16 StickY        = Pad->sThumbLY;
+
+                        if (AButton)
+                        {
+                            YOffset += 2;
+                        }
                     }
                     else
                     {
                         // NOTE(adam): This controller is not available
+                        if (ControllerIndex == 0 && ControllerFound)
+                        {
+                            MessageBox(Window, "Fuck, you lost your controller!!!!!", "FUCK!", MB_OK);
+                            ControllerFound = false;
+                        }
                     }
                 }
 
@@ -343,7 +372,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     GlobalBackBuffer);
 
                 ++XOffset;
-                ++YOffset;
             }
         }
         // Failed to create window
