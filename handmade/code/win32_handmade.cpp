@@ -49,7 +49,8 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
                                   int                    XOffset,
                                   int                    YOffset)
 {
-    // TODO(adam): See what the optimizer does if we pass by value
+    // TODO(adam): See what the optimizer does when we pass Buffer by value
+    // NOTE(adam): See Chandler Carruth lectures for optimization (contributor to LLVM)
     uint8 *Row = (uint8 *)Buffer.Memory;
     for(int Y = 0; Y < Buffer.Height; ++Y)
     {
@@ -62,10 +63,12 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
                 Register:   xx RR GG BB
                 Memory:     BB GG RR XX
             */
+            // uint8 Red = (X + YOffset) - (Y + XOffset);
             uint8 Blue = (X + XOffset);
             uint8 Green = (Y + YOffset);
+            uint8 Red = Blue + Green;
 
-            *Pixel++ = (uint32)((Green << 8) | Blue);
+            *Pixel++ = (uint32)((Red << 16) | (Green << 8) | Blue);
         }
 
         Row += Buffer.Pitch;
@@ -132,13 +135,10 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
 internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
                                          int                    WindowWidth,
                                          int                    WindowHeight,
-                                         win32_offscreen_buffer Buffer,
-                                         int                    X,
-                                         int                    Y,
-                                         int                    Width,
-                                         int                    Height)
+                                         win32_offscreen_buffer Buffer)
 {
     // TODO(adam): Aspect ratio
+    // TODO(adam): Play with stretch modes
     StretchDIBits(
         DeviceContext,
         /* Dirty Rectangle
@@ -274,7 +274,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 {
                     if (Message.message == WM_QUIT)
                     {
-                        Running = false;
+                        GlobalRunning = false;
                     }
                     TranslateMessage(&Message);
                     DispatchMessageA(&Message);
