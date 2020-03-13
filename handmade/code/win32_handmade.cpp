@@ -29,7 +29,6 @@ struct win32_offscreen_buffer
     int         Width;
     int         Height;
     int         Pitch;
-    int         BytesPerPixel;
 };
 
 struct win32_window_dimensions
@@ -109,7 +108,7 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
 
     Buffer->Width = Width;
     Buffer->Height = Height;
-    Buffer->BytesPerPixel = 4; // Only need 3, but 4 will keep us aligned
+    int BytesPerPixel = 4; // Only need 3, but 4 will keep us aligned
 
     Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
     Buffer->Info.bmiHeader.biWidth = Buffer->Width;
@@ -121,9 +120,9 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     // NOTE(adam): Thanks to Chris Hecker of Spy Party fame
     // for pointing out we don't need to use DC if we are
     // using StretchDIBits instead of BitBlt!
-    int BitmapMemorySize = Buffer->BytesPerPixel * Buffer->Width * Buffer->Height;
+    int BitmapMemorySize = BytesPerPixel * Buffer->Width * Buffer->Height;
     Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
-    Buffer->Pitch = Width * Buffer->BytesPerPixel;
+    Buffer->Pitch = Width * BytesPerPixel;
 
     // TODO(adam): Probably clear this to black
 
