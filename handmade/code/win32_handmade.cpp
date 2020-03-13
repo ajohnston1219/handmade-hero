@@ -8,6 +8,7 @@
 #include <windows.h>
 #include <stdint.h>
 #include <xinput.h>
+#include <dsound.h>
 
 #define local_persist   static
 #define global_variable static
@@ -62,6 +63,9 @@ X_INPUT_SET_STATE(XInputSetStateStub)
 global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
 
+#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
+typedef DIRECT_SOUND_CREATE(direct_sound_create);
+
 /*
  * Try to load XInput library
  */
@@ -84,6 +88,91 @@ internal void Win32LoadXInput()
     }
 }
 
+/*
+ * Load and initialize DirectSound
+ */
+internal void Win32InitDSound(HWND  Window,
+                              int32 SamplesPerSecond,
+                              int32 BufferSize)
+{
+    // NOTE(adam): Load the library
+    HMODULE DSoundLibrary = LoadLibraryA("dsound.dll");
+
+    if (DSoundLibrary)
+    {
+        // NOTE(adam): Get a DirectSound object! - cooperative
+        direct_sound_create *DirectSoundCreate =
+            (direct_sound_create *)GetProcAddress(DSoundLibrary, "DirectSoundCreate");
+
+        // TODO(adam): Double check DirectSound8 or 7 ?? works on XP
+        LPDIRECTSOUND DirectSound;
+        if (DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0)))
+        {
+            WAVEFORMATEX WaveFormat = {};
+            WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
+            WaveFormat.nChannels = 2;
+            WaveFormat.nSamplesPerSec = SamplesPerSecond;
+            WaveFormat.wBitsPerSample = 16;
+            WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+            WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
+            WaveFormat.cbSize = 0;
+
+            if (SUCCEEDED(DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
+            {
+                // NOTE(adam): "Create" a primary buffer
+                DSBUFFERDESC BufferDescription = {};
+                BufferDescription.dwSize = sizeof(BufferDescription);
+                BufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+
+                // TODO(adam): DSBCAPS_GLOBALFOCUS?
+                LPDIRECTSOUNDBUFFER  PrimaryBuffer;
+                if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &PrimaryBuffer, 0)))
+                {
+                    HRESULT Error = PrimaryBuffer->SetFormat(&WaveFormat);
+                    if (SUCCEEDED(Error))
+                    {
+                        // NOTE(adam): We have finally set the format!
+                        OutputDebugStringA("Primary buffer format was set.\n");
+                    }
+                    else
+                    {
+                        // TODO(adam): Diagnostic
+                    }
+                }
+            }
+            else
+            {
+                // TODO(adam): Diagnostic
+            }
+            // NOTE(adam): "Create" a secondary buffer
+            // TODO(adam): DSBCAPS_GETCURRENTPOSITION2 ?
+            DSBUFFERDESC BufferDescription = {};
+            BufferDescription.dwSize = sizeof(BufferDescription);
+            BufferDescription.dwFlags = 0;
+            BufferDescription.dwBufferBytes = BufferSize;
+            BufferDescription.lpwfxFormat = &WaveFormat;
+
+            // TODO(adam): DSBCAPS_GLOBALFOCUS?
+            LPDIRECTSOUNDBUFFER  SecondaryBuffer;
+            HRESULT Error = DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0);
+            if (SUCCEEDED(Error))
+            {
+                OutputDebugStringA("Secondary buffer created successfully\n");
+            }
+
+            // NOTE(adam): Start it playing!
+        }
+        else
+        {
+            // TODO(adam): Diagnostic
+        }
+
+    }
+    else
+    {
+        // TODO(adam): Diagnostic
+    }
+}
 
 /*
  * Paint gradient
@@ -372,6 +461,8 @@ int WINAPI wWinMain(HINSTANCE Instance,
             int XOffset = 0;
             int YOffset = 0;
             int RedShift = 100;
+
+            Win32InitDSound(Window, 48000, 48000 * sizeof(int16) * 2);
 
             GlobalRunning = true;
             bool ControllerFound = false;
