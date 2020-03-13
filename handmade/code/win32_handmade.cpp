@@ -109,7 +109,7 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
 /*
  * Get window dimensions
  */
-win32_window_dimensions Win32GetWindowDimensions(HWND Window)
+internal win32_window_dimensions Win32GetWindowDimensions(HWND Window)
 {
     win32_window_dimensions Result;
 
@@ -187,7 +187,7 @@ internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
 /*
  * Message callbacks
  */
-LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
+internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
                                          UINT   Message,
                                          WPARAM WParam,
                                          LPARAM LParam)
