@@ -170,23 +170,19 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
 /*
  * Paint to the bitmap
  */
-internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
-                                         int                    WindowWidth,
-                                         int                    WindowHeight,
-                                         win32_offscreen_buffer Buffer)
+internal void Win32DisplayBufferInWindow(HDC                     DeviceContext,
+                                         win32_offscreen_buffer *Buffer,
+                                         int                     WindowWidth,
+                                         int                     WindowHeight)
 {
     // TODO(adam): Aspect ratio
     // TODO(adam): Play with stretch modes
     StretchDIBits(
         DeviceContext,
-        /* Dirty Rectangle
-        X, Y, Width, Height,
-        X, Y, Width, Height,
-        */
         0, 0, WindowWidth, WindowHeight,
-        0, 0, Buffer.Width, Buffer.Height,
-        Buffer.Memory,
-        &Buffer.Info,
+        0, 0, Buffer->Width, Buffer->Height,
+        Buffer->Memory,
+        &Buffer->Info,
         DIB_RGB_COLORS,
         SRCCOPY);
 }
@@ -195,9 +191,9 @@ internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
  * Message callbacks
  */
 internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
-                                         UINT   Message,
-                                         WPARAM WParam,
-                                         LPARAM LParam)
+                                                  UINT   Message,
+                                                  WPARAM WParam,
+                                                  LPARAM LParam)
 {
     LRESULT Result = 0;
 
@@ -226,7 +222,6 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         case WM_KEYUP:
         {
             uint32 VKCode = WParam;
-
             bool WasDown = ((LParam & (1 << 30)) != 0);
             bool IsDown  = ((LParam & (1 << 31)) == 0);
             if (WasDown != IsDown)
@@ -292,9 +287,9 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
             win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
             Win32DisplayBufferInWindow(
                 DeviceContext,
+                &GlobalBackBuffer,
                 Dimension.Width,
-                Dimension.Height,
-                GlobalBackBuffer);
+                Dimension.Height);
             EndPaint(Window, &Paint);
         } break;
 
@@ -432,16 +427,15 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     }
                 }
 
-                RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
+                RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset, RedShift);
 
                 win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
                 Win32DisplayBufferInWindow(
                     DeviceContext,
+                    &GlobalBackBuffer,
                     Dimension.Width,
-                    Dimension.Height,
-                    GlobalBackBuffer);
+                    Dimension.Height);
 
-                ++XOffset;
             }
         }
         // Failed to create window
