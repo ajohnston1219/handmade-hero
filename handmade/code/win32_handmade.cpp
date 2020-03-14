@@ -572,11 +572,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                                                               0)))
                     {
                         // TODO(adam): assert Region1Size/Region2Size is valid
-                        int16 *SampleOut = (int16 *)Region1;
                         DWORD Region1SampleCount = Region1Size / BytesPerSample;
                         DWORD Region2SampleCount = Region2Size / BytesPerSample;
 
                         // TODO(adam): Collapse these loops
+                        int16 *SampleOut = (int16 *)Region1;
                         for (DWORD SampleIndex = 0;
                             SampleIndex < Region1SampleCount;
                             ++SampleIndex)
@@ -594,7 +594,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
                             *SampleOut++ = SampleValue; // L
                             *SampleOut++ = SampleValue; // R
-                            ++RunningSampleIndex;
                         }
                         GlobalSecondaryBuffer->Unlock(Region1, Region1Size,
                                                       Region2, Region2Size);
