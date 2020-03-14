@@ -146,6 +146,7 @@ internal void Win32InitDSound(HWND  Window,
             {
                 // TODO(adam): Diagnostic
             }
+
             // NOTE(adam): "Create" a secondary buffer
             // TODO(adam): DSBCAPS_GETCURRENTPOSITION2 ?
             DSBUFFERDESC BufferDescription = {};
@@ -257,7 +258,7 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     // for pointing out we don't need to use DC if we are
     // using StretchDIBits instead of BitBlt!
     int BitmapMemorySize = BytesPerPixel * Buffer->Width * Buffer->Height;
-    Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+    Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
     Buffer->Pitch = Width * BytesPerPixel;
 
     // TODO(adam): Probably clear this to black
