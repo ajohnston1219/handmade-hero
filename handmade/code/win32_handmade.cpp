@@ -49,7 +49,7 @@ struct win32_window_dimensions
 };
 
 // TODO(adam): This is a global for now
-global_variable bool                   GlobalRunning;
+global_variable bool32                 GlobalRunning;
 global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER    GlobalSecondaryBuffer;
 
@@ -328,8 +328,8 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         case WM_KEYUP:
         {
             uint32 VKCode = WParam;
-            bool WasDown = ((LParam & (1 << 30)) != 0);
-            bool IsDown  = ((LParam & (1 << 31)) == 0);
+            bool32 WasDown = ((LParam & (1 << 30)) != 0);
+            bool32 IsDown  = ((LParam & (1 << 31)) == 0);
             if (WasDown != IsDown)
             {
                 if      (VKCode == 'W')
@@ -553,7 +553,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
             GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
             GlobalRunning = true;
-            bool ControllerFound = false;
+            bool32 ControllerFound = false;
             while (GlobalRunning)
             {
                 MSG Message;
@@ -584,20 +584,20 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                         XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
 
-                        bool  Up            = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
-                        bool  Down          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
-                        bool  Left          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
-                        bool  Right         = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
-                        bool  Start         = (Pad->wButtons & XINPUT_GAMEPAD_START);
-                        bool  Back          = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
-                        bool  LeftShoulder  = (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
-                        bool  RightShoulder = (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
-                        bool  AButton       = (Pad->wButtons & XINPUT_GAMEPAD_A);
-                        bool  BButton       = (Pad->wButtons & XINPUT_GAMEPAD_B);
-                        bool  XButton       = (Pad->wButtons & XINPUT_GAMEPAD_X);
-                        bool  YButton       = (Pad->wButtons & XINPUT_GAMEPAD_Y);
-                        int16 StickX        = Pad->sThumbLX;
-                        int16 StickY        = Pad->sThumbLY;
+                        bool32 Up            = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+                        bool32 Down          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+                        bool32 Left          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+                        bool32 Right         = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+                        bool32 Start         = (Pad->wButtons & XINPUT_GAMEPAD_START);
+                        bool32 Back          = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
+                        bool32 LeftShoulder  = (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+                        bool32 RightShoulder = (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+                        bool32 AButton       = (Pad->wButtons & XINPUT_GAMEPAD_A);
+                        bool32 BButton       = (Pad->wButtons & XINPUT_GAMEPAD_B);
+                        bool32 XButton       = (Pad->wButtons & XINPUT_GAMEPAD_X);
+                        bool32 YButton       = (Pad->wButtons & XINPUT_GAMEPAD_Y);
+                        int16  StickX        = Pad->sThumbLX;
+                        int16  StickY        = Pad->sThumbLY;
 
                         XOffset -= StickX >> 12;
                         YOffset += StickY >> 12;
