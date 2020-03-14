@@ -476,7 +476,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
             int    SecondaryBufferSize  = SamplesPerSecond * BytesPerSample;
 
             Win32InitDSound(Window, SamplesPerSecond, SamplesPerSecond * BytesPerSample);
-            GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+            bool32 SoundIsPlaying = false;
 
             GlobalRunning = true;
             bool ControllerFound = false;
@@ -552,7 +552,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 {
                     DWORD ByteToLock = (RunningSampleIndex * BytesPerSample) % SecondaryBufferSize;
                     DWORD BytesToWrite;
-                    if (ByteToLock > PlayCursor)
+                    if (ByteToLock == PlayCursor)
+                    {
+                        BytesToWrite = SecondaryBufferSize;
+                    }
+                    else if (ByteToLock > PlayCursor)
                     {
                         BytesToWrite = SecondaryBufferSize - ByteToLock;
                         BytesToWrite += PlayCursor;
@@ -598,6 +602,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         GlobalSecondaryBuffer->Unlock(Region1, Region1Size,
                                                       Region2, Region2Size);
                     }
+                }
+
+                if (!SoundIsPlaying)
+                {
+                    GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+                    SoundIsPlaying = true;
                 }
 
                 win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
