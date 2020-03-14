@@ -575,7 +575,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     ++ControllerIndex)
                 {
                     XINPUT_STATE ControllerState;
-                    if(XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+                    if (XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
                     {
                         // NOTE(adam): This controller is plugged in
                         // TODO(adam): See if ControllerState.dwPacketNumber increments too rapidly
