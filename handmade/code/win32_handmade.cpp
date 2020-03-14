@@ -586,7 +586,8 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             SampleIndex < Region1SampleCount;
                             ++SampleIndex)
                         {
-                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2)
+                                ? ToneVolume : -ToneVolume;
                             *SampleOut++ = SampleValue; // L
                             *SampleOut++ = SampleValue; // R
                         }
@@ -596,7 +597,8 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             SampleIndex < Region2SampleCount;
                             ++SampleIndex)
                         {
-                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2)
+                                ? ToneVolume : -ToneVolume;
                             *SampleOut++ = SampleValue; // L
                             *SampleOut++ = SampleValue; // R
                         }
