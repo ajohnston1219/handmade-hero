@@ -214,9 +214,8 @@ internal void RenderWeirdGradient(win32_offscreen_buffer *Buffer,
                 Register:   xx RR GG BB
                 Memory:     BB GG RR XX
             */
-            // uint8 Red = (X + YOffset) - (Y + XOffset);
-            uint8 Blue = sin(X) * XOffset;
-            uint8 Green = cos(Y) * YOffset;
+            uint8 Blue = X + XOffset;
+            uint8 Green = Y + YOffset;
             uint8 Red = Blue + Green + RedShift;
 
             *Pixel++ = (uint32)((Red << 16) | (Green << 8) | Blue);
@@ -553,7 +552,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
             SoundOutput.WavePeriod            = SoundOutput.SamplesPerSecond / SoundOutput.ToneHz;
             SoundOutput.BytesPerSample        = sizeof(int16) * 2;
             SoundOutput.SecondaryBufferSize   = SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample;
-            SoundOutput.LatencySampleCount    = SoundOutput.SamplesPerSecond / 12;
+            SoundOutput.LatencySampleCount    = SoundOutput.SamplesPerSecond / 15;
 
             Win32InitDSound(Window, SoundOutput.SamplesPerSecond, SoundOutput.SecondaryBufferSize);
             Win32FillSoundBuffer(&SoundOutput, 0, SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample);
