@@ -415,7 +415,7 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         default:
         {
             // OutputDebugStreamA("default\n");
-            Result = DefWindowProc(Window, Message, WParam, LParam);
+            Result = DefWindowProcA(Window, Message, WParam, LParam);
         } break;
     }
 
