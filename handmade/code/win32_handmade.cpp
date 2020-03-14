@@ -44,6 +44,7 @@ struct win32_window_dimensions
 // TODO(adam): This is a global for now
 global_variable bool                   GlobalRunning;
 global_variable win32_offscreen_buffer GlobalBackBuffer;
+global_variable LPDIRECTSOUNDBUFFER    GlobalSecondaryBuffer;
 
 // NOTE(adam): Support for XInputGetState
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -156,8 +157,8 @@ internal void Win32InitDSound(HWND  Window,
             BufferDescription.lpwfxFormat = &WaveFormat;
 
             // TODO(adam): DSBCAPS_GLOBALFOCUS?
-            LPDIRECTSOUNDBUFFER  SecondaryBuffer;
-            HRESULT Error = DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0);
+            GlobalSecondaryBuffer;
+            HRESULT Error = DirectSound->CreateSoundBuffer(&BufferDescription, &GlobalSecondaryBuffer, 0);
             if (SUCCEEDED(Error))
             {
                 OutputDebugStringA("Secondary buffer created successfully\n");
@@ -381,6 +382,7 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         case WM_PAINT:
         {
             PAINTSTRUCT Paint;
+
             HDC DeviceContext = BeginPaint(Window, &Paint);
             int X = Paint.rcPaint.left;
             int Y = Paint.rcPaint.top;
@@ -423,9 +425,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
      * Define window class
      */
     WNDCLASSA WindowClass = {};
-
     Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
-
     WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
     WindowClass.lpfnWndProc = Win32MainWindowCallback;
     WindowClass.hInstance = Instance;
@@ -461,11 +461,21 @@ int WINAPI wWinMain(HINSTANCE Instance,
             // sharing it
             HDC DeviceContext = GetDC(Window);
 
-            int XOffset = 0;
-            int YOffset = 0;
-            int RedShift = 100;
+            int    SamplesPerSecond     = 48000;
+            int    XOffset              = 0;
+            int    YOffset              = 0;
+            int    RedShift             = 100;
+            int    ToneHz               = 256;
+            int    ToneVolume           = 200;
+            uint32 RunningSampleIndex   = 0;
+            int    SquareWaveCounter    = 0;
+            int    SquareWavePeriod     = SamplesPerSecond / ToneHz;
+            int    HalfSquareWavePeriod = SquareWavePeriod / 2;
+            int    BytesPerSample       = sizeof(int16) * 2;
+            int    SecondaryBufferSize  = SamplesPerSecond * BytesPerSample;
 
-            Win32InitDSound(Window, 48000, 48000 * sizeof(int16) * 2);
+            Win32InitDSound(Window, SamplesPerSecond, SamplesPerSecond * BytesPerSample);
+            GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
             GlobalRunning = true;
             bool ControllerFound = false;
@@ -534,13 +544,67 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                 RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset, RedShift);
 
+                // NOTE(adam): DirectSound output test
+                // TODO(adam): Not looping smoothly
+                DWORD PlayCursor;
+                DWORD WriteCursor;
+                if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
+                {
+                    DWORD ByteToLock = (RunningSampleIndex * BytesPerSample) % SecondaryBufferSize;
+                    DWORD BytesToWrite;
+                    if (ByteToLock > PlayCursor)
+                    {
+                        BytesToWrite = SecondaryBufferSize - ByteToLock;
+                        BytesToWrite += PlayCursor;
+                    }
+                    else
+                    {
+                        BytesToWrite = PlayCursor - ByteToLock;
+                    }
+
+                    VOID *Region1;
+                    DWORD Region1Size;
+                    VOID *Region2;
+                    DWORD Region2Size;
+                    if (SUCCEEDED(GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite,
+                                                              &Region1, &Region1Size,
+                                                              &Region2, &Region2Size,
+                                                              0)))
+                    {
+                        // TODO(adam): assert Region1Size/Region2Size is valid
+                        int16 *SampleOut = (int16 *)Region1;
+                        DWORD Region1SampleCount = Region1Size / BytesPerSample;
+                        DWORD Region2SampleCount = Region2Size / BytesPerSample;
+                        for (DWORD SampleIndex = 0;
+                            SampleIndex < Region1SampleCount;
+                            ++SampleIndex)
+                        {
+                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+                            *SampleOut++ = SampleValue; // L
+                            *SampleOut++ = SampleValue; // R
+                        }
+
+                        SampleOut = (int16 *)Region2;
+                        for (DWORD SampleIndex = 0;
+                            SampleIndex < Region2SampleCount;
+                            ++SampleIndex)
+                        {
+                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+                            *SampleOut++ = SampleValue; // L
+                            *SampleOut++ = SampleValue; // R
+                            ++RunningSampleIndex;
+                        }
+                        GlobalSecondaryBuffer->Unlock(&Region1, Region1Size,
+                                                      &Region2, Region2Size);
+                    }
+                }
+
                 win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
                 Win32DisplayBufferInWindow(
                     DeviceContext,
                     &GlobalBackBuffer,
                     Dimension.Width,
                     Dimension.Height);
-
             }
         }
         // Failed to create window
