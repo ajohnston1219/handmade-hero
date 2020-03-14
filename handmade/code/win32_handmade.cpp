@@ -424,6 +424,7 @@ struct win32_sound_output
     int    WavePeriod;
     int    BytesPerSample;
     int    SecondaryBufferSize;
+    real32 tSine;
 };
 
 internal void Win32FillSoundBuffer(win32_sound_output *SoundOutput,
@@ -450,11 +451,13 @@ internal void Win32FillSoundBuffer(win32_sound_output *SoundOutput,
              SampleIndex < Region1SampleCount;
              ++SampleIndex)
         {
-            real32 t = 2.0f * Pi32 * (real32)SoundOutput->RunningSampleIndex++ / (real32)SoundOutput->WavePeriod;
-            real32 SineValue = sinf(t);
+            real32 SineValue = sinf(SoundOutput->tSine);
             int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
             *SampleOut++ = SampleValue; // L
             *SampleOut++ = SampleValue; // R
+
+            SoundOutput->tSine += 2.0f * Pi32  / (real32)SoundOutput->WavePeriod;
+            ++SoundOutput->RunningSampleIndex;
         }
 
         SampleOut = (int16 *)Region2;
@@ -462,11 +465,13 @@ internal void Win32FillSoundBuffer(win32_sound_output *SoundOutput,
              SampleIndex < Region2SampleCount;
              ++SampleIndex)
         {
-            real32 t = 2.0f * Pi32 * (real32)SoundOutput->RunningSampleIndex++ / (real32)SoundOutput->WavePeriod;
-            real32 SineValue = sinf(t);
+            real32 SineValue = sinf(SoundOutput->tSine);
             int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
             *SampleOut++ = SampleValue; // L
             *SampleOut++ = SampleValue; // R
+
+            SoundOutput->tSine += 2.0f * Pi32  / (real32)SoundOutput->WavePeriod;
+            ++SoundOutput->RunningSampleIndex;
         }
         GlobalSecondaryBuffer->Unlock(Region1, Region1Size,
                                       Region2, Region2Size);
@@ -533,9 +538,10 @@ int WINAPI wWinMain(HINSTANCE Instance,
             win32_sound_output SoundOutput = {};
 
             SoundOutput.SamplesPerSecond    = 48000;
-            SoundOutput.ToneHz              = 456;
+            SoundOutput.ToneHz              = 256;
             SoundOutput.ToneVolume          = 10000;
             // SoundOutput.RunningSampleIndex  = 0;
+            // SoundOutput.tSine               = 0;
             SoundOutput.WavePeriod          = SoundOutput.SamplesPerSecond / SoundOutput.ToneHz;
             SoundOutput.BytesPerSample      = sizeof(int16) * 2;
             SoundOutput.SecondaryBufferSize = SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample;
@@ -595,8 +601,19 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         XOffset -= StickX >> 12;
                         YOffset += StickY >> 12;
 
-                        if (AButton) { RedShift += 5; }
-                        if (BButton) { RedShift -= 5; }
+                        // SoundOutput.ToneHz = 456 + (StickX/1000) + (StickY/1000);
+
+                        if (AButton)
+                        {
+                            RedShift += 5;
+                            SoundOutput.ToneHz = 512 + (int)(256.0f * (real32)StickY / 30000.0f);
+                        }
+                        if (BButton)
+                        {
+                            RedShift -= 5;
+                            SoundOutput.ToneHz = 256;
+                        }
+                        SoundOutput.WavePeriod = SoundOutput.SamplesPerSecond / SoundOutput.ToneHz;
 
                     }
                     else
