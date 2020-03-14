@@ -545,7 +545,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset, RedShift);
 
                 // NOTE(adam): DirectSound output test
-                // TODO(adam): Not looping smoothly
                 DWORD PlayCursor;
                 DWORD WriteCursor;
                 if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
@@ -594,8 +593,8 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             *SampleOut++ = SampleValue; // R
                             ++RunningSampleIndex;
                         }
-                        GlobalSecondaryBuffer->Unlock(&Region1, Region1Size,
-                                                      &Region2, Region2Size);
+                        GlobalSecondaryBuffer->Unlock(Region1, Region1Size,
+                                                      Region2, Region2Size);
                     }
                 }
 
