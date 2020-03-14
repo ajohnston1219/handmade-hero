@@ -566,6 +566,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         BytesToWrite = PlayCursor - ByteToLock;
                     }
 
+                    // TODO(adam): Switch to sine wave
                     VOID *Region1;
                     DWORD Region1Size;
                     VOID *Region2;
