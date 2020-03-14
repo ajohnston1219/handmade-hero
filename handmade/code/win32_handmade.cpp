@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <xinput.h>
 #include <dsound.h>
+#include <stdio.h>
 // TODO(adam): Implement sine function ourselves
 #include <math.h>
 
@@ -494,6 +495,13 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     int       ShowCode)
 {
     /*
+     * Get frequency for time calculations
+     */
+    LARGE_INTEGER PerfCountFrequencyResult;
+    QueryPerformanceFrequency(&PerfCountFrequencyResult);
+    int64 PerfCountFrequency = PerfCountFrequencyResult.QuadPart;
+
+    /*
      * Define Xinput functions
      */
     Win32LoadXInput();
@@ -560,6 +568,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
             GlobalRunning = true;
             bool32 ControllerFound = false;
+
+            LARGE_INTEGER LastCounter;
+            QueryPerformanceCounter(&LastCounter);
+            uint64 LastCycleCount = __rdtsc();
+
             while (GlobalRunning)
             {
                 MSG Message;
@@ -642,9 +655,10 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 DWORD WriteCursor;
                 if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
-                    DWORD ByteToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
-                    DWORD TargetCursor = (PlayCursor +
-                                          (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.SecondaryBufferSize;
+                    DWORD ByteToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample)
+                        % SoundOutput.SecondaryBufferSize;
+                    DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample))
+                        % SoundOutput.SecondaryBufferSize;
                     DWORD BytesToWrite;
 
                     // TODO(adam): Change this to using lower latency offset form playcursor
@@ -667,6 +681,25 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     &GlobalBackBuffer,
                     Dimension.Width,
                     Dimension.Height);
+
+                uint64 EndCycleCount = __rdtsc();
+
+                LARGE_INTEGER EndCounter;
+                QueryPerformanceCounter(&EndCounter);
+
+                uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
+                int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
+                real32 MSPerFrame = 1000.0f * (real32)CounterElapsed / (real32)PerfCountFrequency;
+                real32 FramesPerSecond =  1000.0f / MSPerFrame;
+                real32 MCPF = CyclesElapsed / 1e6f;
+
+                char MsgBuffer[256];
+                sprintf(MsgBuffer, "%.2f ms/f, FPS: %.2f, %.2f Mc/f\n", MSPerFrame, FramesPerSecond, MCPF);
+                OutputDebugStringA(MsgBuffer);
+
+                LastCounter = EndCounter;
+                LastCycleCount = EndCycleCount;
+
             }
         }
         // Failed to create window
