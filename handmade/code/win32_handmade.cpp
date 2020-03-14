@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <xinput.h>
 #include <dsound.h>
+#include <cmath>
 
 #define local_persist   static
 #define global_variable static
@@ -201,9 +202,9 @@ internal void RenderWeirdGradient(win32_offscreen_buffer *Buffer,
                 Memory:     BB GG RR XX
             */
             // uint8 Red = (X + YOffset) - (Y + XOffset);
-            uint8 Blue = (X + XOffset) - Y*Y/4;
-            uint8 Green = (Y + YOffset) + X*X/4;
-            uint8 Red = Blue + Green + RedShift + X*Y/4;
+            uint8 Blue = sin(X) * XOffset;
+            uint8 Green = cos(Y) * YOffset;
+            uint8 Red = Blue + Green + RedShift;
 
             *Pixel++ = (uint32)((Red << 16) | (Green << 8) | Blue);
         }
