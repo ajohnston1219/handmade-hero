@@ -21,11 +21,19 @@ struct game_offscreen_buffer
 {
     // NOTE(adam): Pixels are always 32-bits widw,
     // Memory Order: BB GG RR XX
-    void       *Memory;
-    int         Width;
-    int         Height;
-    int         Pitch;
+    void *Memory;
+    int   Width;
+    int   Height;
+    int   Pitch;
 };
+
+struct game_sound_output_buffer
+{
+    int SamplesPerSecond;
+    int SampleCount;
+    int16 *Samples;
+};
+
 void GameUpdateAndRender(game_offscreen_buffer *Buffer, int XOffset, int YOffset, int RedShift);
 
 void *PlatformLoadFile(char *Filename);

@@ -1,4 +1,31 @@
 #include "handmade.h"
+#include <math.h>
+
+/*
+ * Fill buffer ahead of play cursor
+ */
+internal void OutputGameSound(game_sound_output_buffer *SoundBuffer,
+                              int                       ToneHz)
+{
+    local_persist real32 tSine;
+    int16 ToneVolume = 3000;
+
+    int WavePeriod = SoundBuffer->SamplesPerSecond / ToneHz;
+
+    int16 *SampleOut = SoundBuffer->Samples;
+    for (int SampleIndex = 0;
+         SampleIndex < SoundBuffer->SampleCount;
+         ++SampleIndex)
+    {
+        real32 SineValue = sinf(tSine);
+        int16 SampleValue = (int16)(SineValue * ToneVolume);
+        *SampleOut++ = SampleValue; // L
+        *SampleOut++ = SampleValue; // R
+
+        tSine += 2.0f * Pi32  / (real32)WavePeriod;
+    }
+}
+
 
 /*
  * Paint to bitmap
@@ -33,8 +60,15 @@ internal void RenderWeirdGradient(game_offscreen_buffer *Buffer,
     }
 }
 
-internal void GameUpdateAndRender(game_offscreen_buffer *Buffer, int XOffset, int YOffset, int RedShift)
+internal void GameUpdateAndRender(game_offscreen_buffer    *Buffer,
+                                  int                       XOffset,
+                                  int                       YOffset,
+                                  int                       RedShift,
+                                  game_sound_output_buffer *SoundBuffer,
+                                  int                       ToneHz)
 {
+    // TODO(adam): Allow sample offsets here for more robust platform options
+    OutputGameSound(SoundBuffer, ToneHz);
     RenderWeirdGradient(Buffer, XOffset, YOffset, RedShift);
 }
 
