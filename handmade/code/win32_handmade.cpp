@@ -4,6 +4,22 @@
 // Created: 3/12/2020    //
 ///////////////////////////
 
+/*
+ * TODO(adam): THIS IS NOT A FINAL PLATFORM LAYER!!!
+ *
+ * - Saved game locations
+ * - Getting a handle to our own executable file
+ * - Asset loading path
+ * - Threading (launch a thread)
+ * - Raw input (support multiple keyboards)
+ * - Sleep/timeBeginPeriod
+ * - ClipCursor() (for multimonitor support)
+ * - WM_SETCURSOR (control cursor visibility)
+ * - WM_ACTIVATEAPP (for when we are not active application)
+ * - Blit speed improvements (BitBlit)
+ * - Hardware acceleration (OpenGL or Direct3D or BOTH??)
+ * - GetKeyboardLayout (for French keyboards, international WASD support)
+ */
 
 #include <windows.h>
 #include <stdint.h>
@@ -435,6 +451,9 @@ struct win32_sound_output
     int    LatencySampleCount;
 };
 
+/*
+ * Fill buffer ahead of play cursor
+ */
 internal void Win32FillSoundBuffer(win32_sound_output *SoundOutput,
                                    DWORD               ByteToLock,
                                    DWORD               BytesToWrite)
@@ -537,7 +556,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 Instance,
                 0);
         /*
-         * If successful, loop through messages
+         * If successful, set up sound buffer and start game
          */
         if (Window)
         {
@@ -573,8 +592,15 @@ int WINAPI wWinMain(HINSTANCE Instance,
             QueryPerformanceCounter(&LastCounter);
             uint64 LastCycleCount = __rdtsc();
 
+
+            /*
+             * Start game loop
+             */
             while (GlobalRunning)
             {
+                /*
+                 * Check for OS messages
+                 */
                 MSG Message;
                 // vvv Blocks
                 // BOOL MessageResult = GetMessageA(&Message, 0, 0, 0);
@@ -588,6 +614,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     DispatchMessageA(&Message);
                 }
 
+                /*
+                 * Poll game controllers
+                 */
                 // TODO(adam): Should we poll this more frequently?
                 for (DWORD ControllerIndex = 0;
                      ControllerIndex < XUSER_MAX_COUNT;
@@ -648,8 +677,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     }
                 }
 
-                RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset, RedShift);
-
+                /*
+                 * Write audio to buffer
+                 */
                 // NOTE(adam): DirectSound output test
                 DWORD PlayCursor;
                 DWORD WriteCursor;
@@ -675,6 +705,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite);
                 }
 
+                /*
+                 * Render frame
+                 */
+                RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset, RedShift);
+
                 win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
                 Win32DisplayBufferInWindow(
                     DeviceContext,
@@ -682,6 +717,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     Dimension.Width,
                     Dimension.Height);
 
+                /*
+                 * Profiling
+                 */
                 uint64 EndCycleCount = __rdtsc();
 
                 LARGE_INTEGER EndCounter;
