@@ -5,29 +5,24 @@
 ///////////////////////////
 
 /*
- * TODO(adam): THIS IS NOT A FINAL PLATFORM LAYER!!!
- *
- * - Saved game locations
- * - Getting a handle to our own executable file
- * - Asset loading path
- * - Threading (launch a thread)
- * - Raw input (support multiple keyboards)
- * - Sleep/timeBeginPeriod
- * - ClipCursor() (for multimonitor support)
- * - WM_SETCURSOR (control cursor visibility)
- * - WM_ACTIVATEAPP (for when we are not active application)
- * - Blit speed improvements (BitBlit)
- * - Hardware acceleration (OpenGL or Direct3D or BOTH??)
- * - GetKeyboardLayout (for French keyboards, international WASD support)
+   TODO(adam): THIS IS NOT A FINAL PLATFORM LAYER!!!
+
+   - Saved game locations
+   - Getting a handle to our own executable file
+   - Asset loading path
+   - Threading (launch a thread)
+   - Raw input (support multiple keyboards)
+   - Sleep/timeBeginPeriod
+   - ClipCursor() (for multimonitor support)
+   - WM_SETCURSOR (control cursor visibility)
+   - WM_ACTIVATEAPP (for when we are not active application)
+   - Blit speed improvements (BitBlit)
+   - Hardware acceleration (OpenGL or Direct3D or BOTH??)
+   - GetKeyboardLayout (for French keyboards, international WASD support)
+
  */
 
-#include <windows.h>
 #include <stdint.h>
-#include <xinput.h>
-#include <dsound.h>
-#include <stdio.h>
-// TODO(adam): Implement sine function ourselves
-#include <math.h>
 
 #define local_persist   static
 #define global_variable static
@@ -49,6 +44,15 @@ typedef float  real32;
 typedef double real64;
 
 typedef int32 bool32;
+
+#include "handmade.cpp"
+
+#include <windows.h>
+#include <xinput.h>
+#include <dsound.h>
+#include <stdio.h>
+// TODO(adam): Implement sine function ourselves
+#include <math.h>
 
 struct win32_offscreen_buffer
 {
@@ -209,38 +213,6 @@ internal void Win32InitDSound(HWND  Window,
     }
 }
 
-/*
- * Paint gradient
- */
-internal void RenderWeirdGradient(win32_offscreen_buffer *Buffer,
-                                  int                     XOffset,
-                                  int                     YOffset,
-                                  int                     RedShift)
-{
-    // TODO(adam): See what the optimizer does when we pass Buffer by value
-    // NOTE(adam): See Chandler Carruth lectures for optimization (contributor to LLVM)
-    uint8 *Row = (uint8 *)Buffer->Memory;
-    for(int Y = 0; Y < Buffer->Height; ++Y)
-    {
-        uint32 *Pixel = (uint32 *)Row;
-        for (int X = 0; X < Buffer->Width; ++X)
-        {
-            /*
-            Little endian architecture so bytes are reversed
-            Pixel:
-                Register:   xx RR GG BB
-                Memory:     BB GG RR XX
-            */
-            uint8 Blue = X + XOffset;
-            uint8 Green = Y + YOffset;
-            uint8 Red = Blue + Green + RedShift;
-
-            *Pixel++ = (uint32)((Red << 16) | (Green << 8) | Blue);
-        }
-
-        Row += Buffer->Pitch;
-    }
-}
 
 /*
  * Get window dimensions
@@ -458,7 +430,6 @@ internal void Win32FillSoundBuffer(win32_sound_output *SoundOutput,
                                    DWORD               ByteToLock,
                                    DWORD               BytesToWrite)
 {
-    // TODO(adam): Switch to sine wave
     VOID *Region1;
     DWORD Region1Size;
     VOID *Region2;
@@ -691,7 +662,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         % SoundOutput.SecondaryBufferSize;
                     DWORD BytesToWrite;
 
-                    // TODO(adam): Change this to using lower latency offset form playcursor
                     if (ByteToLock > TargetCursor)
                     {
                         BytesToWrite = SoundOutput.SecondaryBufferSize - ByteToLock;
@@ -708,7 +678,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 /*
                  * Render frame
                  */
-                RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset, RedShift);
+                game_offscreen_buffer Buffer = {};
+                Buffer.Memory = GlobalBackBuffer.Memory;
+                Buffer.Width = GlobalBackBuffer.Width;
+                Buffer.Height = GlobalBackBuffer.Height;
+                Buffer.Pitch = GlobalBackBuffer.Pitch;
+                GameUpdateAndRender(&Buffer, XOffset, YOffset, RedShift);
 
                 win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
                 Win32DisplayBufferInWindow(
@@ -731,9 +706,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 real32 FramesPerSecond =  1000.0f / MSPerFrame;
                 real32 MCPF = CyclesElapsed / 1e6f;
 
+#if 0
                 char MsgBuffer[256];
                 sprintf(MsgBuffer, "%.2f ms/f, FPS: %.2f, %.2f Mc/f\n", MSPerFrame, FramesPerSecond, MCPF);
                 OutputDebugStringA(MsgBuffer);
+#endif
 
                 LastCounter = EndCounter;
                 LastCycleCount = EndCycleCount;
