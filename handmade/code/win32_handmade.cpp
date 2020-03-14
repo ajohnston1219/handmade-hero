@@ -606,8 +606,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         int16  StickX        = Pad->sThumbLX;
                         int16  StickY        = Pad->sThumbLY;
 
-                        XOffset -= StickX >> 12;
-                        YOffset += StickY >> 12;
+                        // TODO(adam): Handle deadzone with
+                        // XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE   7849
+                        // XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE  8689
+                        XOffset -= StickX / 2048;
+                        YOffset += StickY / 2048;
 
                         if (AButton)
                         {
