@@ -70,6 +70,15 @@ internal void GameUpdateAndRender(game_memory              *Memory,
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
+        char *Filename = __FILE__;
+
+        debug_read_file_result File = DEBUGPlatformReadEntireFile(Filename);
+        if (File.Contents)
+        {
+            DEBUGPlatformWriteEntireFile("test.out", File.ContentSize, File.Contents);
+            DEBUGPlatformFreeFileMemory(File.Contents);
+        }
+
         // NOTE(adam): Game memory is initialized to zero
         GameState->ToneHz = 256;
         // TODO(adam): May be better to do in platform layer

@@ -12,12 +12,22 @@
     1 - Slow code welcome
  */
 
-// Write to the nullptr bcynot
 #if HANDMADE_SLOW
+
+/* NOTE(adam):
+
+   These are NOT for doing anythong in the shipping game
+   They are blocking and the write doesn't protect against
+   lost data.
+
+ */
+
 // TODO(adam): Complete assertion macro
+// Write to the nullptr bcynot
 #define Assert(Expression) if (!(Expression)) { *(int *)0 = 0; }
 #else
 #define Assert(Expression)
+
 #endif
 
 // TODO(adam): Should these always use 64 bit?
@@ -32,8 +42,20 @@
  */
 
 /*
- * TODO(adam): Services that the platform layer provides to the game.
+ * NOTE(adam): Services that the platform layer provides to the game.
  */
+#if HANDMADE_INTERNAL
+struct debug_read_file_result
+{
+    uint32 ContentSize;
+    void *Contents;
+};
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
+internal void DEBUGPlatformFreeFileMemory(void *Memory);
+internal bool32 DEBUGPlatformWriteEntireFile(char   *Filename,
+                                             uint32  MemorySize,
+                                             void   *Memory);
+#endif
 
 /*
  * NOTE(adam): Services that the game provides to the platform layer.
