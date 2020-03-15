@@ -31,8 +31,8 @@ internal void OutputGameSound(game_sound_output_buffer *SoundBuffer,
  * Paint to bitmap
  */
 internal void RenderWeirdGradient(game_offscreen_buffer *Buffer,
-                                  int                    XOffset,
-                                  int                    YOffset,
+                                  int                    BlueOffset,
+                                  int                    GreenOffset,
                                   int                    RedShift)
 {
     // TODO(adam): See what the optimizer does when we pass Buffer by value
@@ -49,8 +49,8 @@ internal void RenderWeirdGradient(game_offscreen_buffer *Buffer,
                 Register:   xx RR GG BB
                 Memory:     BB GG RR XX
             */
-            uint8 Blue = X + XOffset;
-            uint8 Green = Y + YOffset;
+            uint8 Blue = X + BlueOffset;
+            uint8 Green = Y + GreenOffset;
             uint8 Red = Blue + Green + RedShift;
 
             *Pixel++ = (uint32)((Red << 16) | (Green << 8) | Blue);
@@ -60,16 +60,41 @@ internal void RenderWeirdGradient(game_offscreen_buffer *Buffer,
     }
 }
 
-internal void GameUpdateAndRender(game_offscreen_buffer    *Buffer,
-                                  int                       XOffset,
-                                  int                       YOffset,
-                                  int                       RedShift,
-                                  game_sound_output_buffer *SoundBuffer,
-                                  int                       ToneHz)
+internal void GameUpdateAndRender(game_input               *Input,
+                                  game_offscreen_buffer    *Buffer,
+                                  game_sound_output_buffer *SoundBuffer)
 {
+    local_persist int BlueOffset = 0;
+    local_persist int GreenOffset = 0;
+    local_persist int RedShift = 0;
+    local_persist int ToneHz = 256;
+
+    game_controller_input *Input0 = &Input->Controllers[0];
+    if (Input0->IsAnalog)
+    {
+        // NOTE(adam): Use analog movement tuning
+        ToneHz = 256 + (int)(128.0f * (Input0->EndX));
+        BlueOffset += (int)(4.0f * (Input0->EndY));
+        char MsgBuffer[256];
+        wsprintfA(MsgBuffer, "Blue Offset = %d\n", BlueOffset);
+        OutputDebugStringA(MsgBuffer);
+    }
+    else
+    {
+        // NOTE(adam): Use digital movement tuning
+    }
+
+    // Input.AButtonEndedDown;
+    // Input.AButtonHalfTransitionCount;
+    if (Input0->Down.EndedDown)
+    {
+        GreenOffset += 1;
+        RedShift -= 1;
+    }
+
     // TODO(adam): Allow sample offsets here for more robust platform options
     OutputGameSound(SoundBuffer, ToneHz);
-    RenderWeirdGradient(Buffer, XOffset, YOffset, RedShift);
+    RenderWeirdGradient(Buffer, BlueOffset, GreenOffset, RedShift);
 }
 
 void MainLoop()
