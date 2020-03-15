@@ -639,12 +639,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                             XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
 
-                            bool32 Up            = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
-                            bool32 Down          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
-                            bool32 Left          = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
-                            bool32 Right         = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
-                            int16  StickX        = Pad->sThumbLX;
-                            int16  StickY        = Pad->sThumbLY;
+                            bool32 Up     = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+                            bool32 Down   = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+                            bool32 Left   = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+                            bool32 Right  = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+                            int16  StickX = Pad->sThumbLX;
+                            int16  StickY = Pad->sThumbLY;
 
                             NewController->StartX = OldController->EndX;
                             NewController->StartY = OldController->EndY;
