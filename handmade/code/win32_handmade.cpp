@@ -24,10 +24,6 @@
 
 #include <stdint.h>
 
-#define local_persist   static
-#define global_variable static
-#define internal        static
-
 #define Pi32 3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342
 
 typedef  uint8_t  uint8;
@@ -155,7 +151,7 @@ internal bool32 DEBUGPlatformWriteEntireFile(char   *Filename,
                                              uint32  MemorySize,
                                              void   *Memory)
 {
-    bool32 Result;
+    bool32 Result = false;
 
     HANDLE FileHandle = CreateFileA(Filename, GENERIC_WRITE, FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
     if (FileHandle != INVALID_HANDLE_VALUE)
@@ -407,7 +403,7 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         case WM_KEYDOWN:
         case WM_KEYUP:
         {
-            uint32 VKCode = WParam;
+            uint32 VKCode = (uint32)WParam;
             bool32 WasDown = ((LParam & (1 << 30)) != 0);
             bool32 IsDown  = ((LParam & (1 << 31)) == 0);
             if (WasDown != IsDown)
@@ -715,7 +711,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                      * Poll game controllers
                      */
                     // TODO(adam): Should we poll this more frequently?
-                    int MaxControllerCount = XUSER_MAX_COUNT;
+                    DWORD MaxControllerCount = XUSER_MAX_COUNT;
                     if (MaxControllerCount > ArrayCount(NewInput->Controllers))
                     {
                         MaxControllerCount = ArrayCount(NewInput->Controllers);

@@ -1,5 +1,9 @@
 #if !defined(HANDMADE_H)
 
+#define local_persist   static
+#define global_variable static
+#define internal        static
+
 /*
   NOTE(adam):
 
@@ -50,8 +54,11 @@ struct debug_read_file_result
     uint32 ContentSize;
     void *Contents;
 };
+
 internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
+
 internal void DEBUGPlatformFreeFileMemory(void *Memory);
+
 internal bool32 DEBUGPlatformWriteEntireFile(char   *Filename,
                                              uint32  MemorySize,
                                              void   *Memory);
@@ -149,12 +156,10 @@ struct game_state
     int BlueOffset;
 };
 
-void GameUpdateAndRender(game_memory              *Memory,
+internal void GameUpdateAndRender(game_memory              *Memory,
                          game_input               *Input,
                          game_offscreen_buffer    *Buffer,
                          game_sound_output_buffer *SoundBuffer);
-
-void *PlatformLoadFile(char *Filename);
 
 #define HANDMADE_H
 #endif
