@@ -4,7 +4,7 @@
 
 IF NOT EXIST ..\..\build mkdir ..\..\build
 pushd ..\..\build
-cl -MT -nologo -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -FC -Z7 -Fmwin32_handmade.map ..\handmade\code\win32_handmade.cpp /link -opt:ref -subsystem:windows,5.1 user32.lib Gdi32.lib
+cl -MT -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -FC -Z7 -Fmwin32_handmade.map ..\handmade\code\win32_handmade.cpp /link -opt:ref user32.lib Gdi32.lib
 ::  WX:   Treat warnings as errors
 ::  W4:   Warning level
 ::  wd:   Ignore warning
@@ -13,6 +13,7 @@ cl -MT -nologo -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DHANDMADE_IN
 ::  Zi:   Complete debugging info
 ::  Z7:   Older version of debugging info
 ::  Oi:   Use intrinsics when possible
+:: -Od:   Turn off optimizations for debugging
 ::  GR-:  Turn off runtime type info
 ::  EHa-: Turn off exception handling
 ::  -Gm-: Turn off minimal rebuild
