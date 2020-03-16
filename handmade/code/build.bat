@@ -1,10 +1,18 @@
 @echo off
 
+set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -FC -Z7 -Fmwin32_handmade.map 
+
+set CommonLinkerFlags=-opt:ref user32.lib Gdi32.lib
 :: TODO - can we just build both with one exe?
 
 IF NOT EXIST ..\..\build mkdir ..\..\build
 pushd ..\..\build
-cl -MT -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -FC -Z7 -Fmwin32_handmade.map ..\handmade\code\win32_handmade.cpp /link -opt:ref user32.lib Gdi32.lib
+
+:: 32-bit build
+:: cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link -subsystem:windows,5.1 %CommonLinkerFLags%
+:: 64-bit build
+cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link %CommonLinkerFLags%
+
 ::  WX:   Treat warnings as errors
 ::  W4:   Warning level
 ::  wd:   Ignore warning
