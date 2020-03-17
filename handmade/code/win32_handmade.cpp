@@ -670,6 +670,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
     QueryPerformanceFrequency(&PerfCountFrequencyResult);
     GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
 
+    // NOTE(adam): Set the Windows scheduler granularity to 1 ms
+    // so that our sleep is more granular
+    UINT DesiredSchedulerMS = 1;
+    bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
+
     /*
      * Define Xinput functions
      */
@@ -986,13 +991,17 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     LARGE_INTEGER WorkCounter = Win32GetWallClock();
                     real32 WorkSecondsElapsed = Win32GetSecondsElapsed(LastCounter, WorkCounter);
 
+                    // TODO(adam): NOT TESTED YET! PROBABLY BUGGY!!!!!
                     real32 SecondsElapsedForFrame = WorkSecondsElapsed;
                     if (SecondsElapsedForFrame < TargetSecondsPerFrame)
                     {
                         while (SecondsElapsedForFrame < TargetSecondsPerFrame)
                         {
-                            DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
-                            Sleep(SleepMS);
+                            if (SleepIsGranular)
+                            {
+                                DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
+                                Sleep(SleepMS);
+                            }
                             SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
                         }
                     }
@@ -1013,26 +1022,26 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         Dimension.Height);
 
 
-#if 0
-                    real32 MSPerFrame = 1000.0f * (real32)CounterElapsed / (real32)PerfCountFrequency;
-                    real32 FramesPerSecond =  1000.0f / MSPerFrame;
-                    real32 MCPF = CyclesElapsed / 1e6f;
-
-                    char MsgBuffer[256];
-                    sprintf(MsgBuffer, "%.2f ms/f, FPS: %.2f, %.2f Mc/f\n", MSPerFrame, FramesPerSecond, MCPF);
-                    OutputDebugStringA(MsgBuffer);
-#endif
-                    LARGE_INTEGER EndCounter = Win32GetWallClock();
-                    LastCounter = EndCounter;
-
                     game_input *Temp = NewInput;
                     NewInput = OldInput;
                     OldInput = Temp;
                     // TODO(adam): Should I clear these here?
 
+
+                    LARGE_INTEGER EndCounter = Win32GetWallClock();
+                    real32 MSPerFrame = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
+                    LastCounter = EndCounter;
+
                     uint64 EndCycleCount = __rdtsc();
                     uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
                     LastCycleCount = EndCycleCount;
+
+                    real32 FPS = 0.0f;
+                    real32 MCPF = (real32)CyclesElapsed / 1e6f;
+
+                    char MsgBuffer[256];
+                    _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "%.2f ms/f, FPS: %.2f, %.2f Mc/f\n", MSPerFrame, FPS, MCPF);
+                    OutputDebugStringA(MsgBuffer);
                 }
             }
             // Failed to allocate memory
