@@ -332,6 +332,7 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     Buffer->Width = Width;
     Buffer->Height = Height;
     int BytesPerPixel = 4; // Only need 3, but 4 will keep us aligned
+    Buffer->BytesPerPixel = BytesPerPixel;
 
     Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
     Buffer->Info.bmiHeader.biWidth = Buffer->Width;
@@ -654,6 +655,78 @@ inline real32 Win32GetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
     return Result;
 }
 
+/*
+ * Sound debugging display
+ */
+internal void Win32DebugDrawVertical(win32_offscreen_buffer *BackBuffer,
+                                     int                     X,
+                                     int                     Top,
+                                     int                     Bottom,
+                                     uint32                  Color)
+{
+    uint8 *Pixel = ((uint8 *)BackBuffer->Memory
+                    + X*BackBuffer->BytesPerPixel
+                    + Top*BackBuffer->Pitch);
+    for (int Y = Top;
+         Y < Bottom;
+         ++Y)
+    {
+        *(uint32 *)Pixel = Color;
+        Pixel += BackBuffer->Pitch;
+    }
+}
+
+
+internal void Win32DrawSoundBufferMarker(win32_offscreen_buffer *BackBuffer,
+                                         win32_sound_output     *SoundOutput,
+                                         real32                  C,
+                                         int                     PadX,
+                                         int                     Top,
+                                         int                     Bottom,
+                                         DWORD                   Value,
+                                         uint32                  Color)
+{
+    Assert(Value < (DWORD)SoundOutput->SecondaryBufferSize);
+    real32 XReal32 = (C * (real32)Value);
+    int X = PadX + (int)XReal32;
+// int X = PadX + (int)(C * LastPlayCursor[PlayCursorIndex]);
+    Win32DebugDrawVertical(BackBuffer, X, Top, Bottom, Color);
+}
+
+internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
+                                    int                      MarkerCount,
+                                    win32_debug_time_marker *Markers,
+                                    win32_sound_output      *SoundOutput,
+                                    real32                   TargetSecondsPerFrame)
+{
+    // TODO(adam): Draw where we're writing out sound
+
+    int PadX = 16;
+    int PadY = 16;
+
+    int Top = PadY;
+    int Bottom = BackBuffer->Height - PadY;
+
+    real32 C = (real32)(BackBuffer->Width - 2*PadX) / (real32)SoundOutput->SecondaryBufferSize;
+    for (int PlayCursorIndex = 0;
+         PlayCursorIndex < MarkerCount;
+         ++PlayCursorIndex)
+    {
+        win32_debug_time_marker *ThisMarker = &Markers[PlayCursorIndex];
+        Win32DrawSoundBufferMarker(
+            BackBuffer,
+            SoundOutput,
+            C, PadX, Top, Bottom,
+            ThisMarker->PlayCursor,
+            0xFFFFFFFF);
+        Win32DrawSoundBufferMarker(
+            BackBuffer,
+            SoundOutput,
+            C, PadX, Top, Bottom,
+            ThisMarker->WriteCursor,
+            0xFFFF0000);
+    }
+}
 
 /*
  * Main function called by Windows
@@ -673,7 +746,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
     // NOTE(adam): Set the Windows scheduler granularity to 1 ms
     // so that our sleep is more granular
     UINT DesiredSchedulerMS = 1;
-    bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
 
     /*
      * Define Xinput functions
@@ -692,8 +764,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
     WindowClass.lpszClassName = "HandmadeHeroWindowClass";
 
     // TODO(adam): How do we reliably query this on Windows?
-    int MonitorRefreshHz = 60;
-    int GameUpdateHz = MonitorRefreshHz / 2;
+    // TODO(adam): Consider not syncing audio with frames
+    // TODO(adam): User write cursor delta to adjust target
+    // audio latency
+#define MonitorRefreshHz 60
+#define FramesOfAudioLatency 3
+#define GameUpdateHz (MonitorRefreshHz / 2)
     real32 TargetSecondsPerFrame = 1.0f / (real32)GameUpdateHz;
 
     /*
@@ -715,6 +791,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 0,
                 Instance,
                 0);
+
         /*
          * If successful, set up sound buffer and start game
          */
@@ -726,12 +803,10 @@ int WINAPI wWinMain(HINSTANCE Instance,
             HDC DeviceContext = GetDC(Window);
 
             win32_sound_output SoundOutput = {};
-
             SoundOutput.SamplesPerSecond      = 48000;
-            // SoundOutput.RunningSampleIndex = 0;
             SoundOutput.BytesPerSample        = sizeof(int16) * 2;
             SoundOutput.SecondaryBufferSize   = SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample;
-            SoundOutput.LatencySampleCount    = SoundOutput.SamplesPerSecond / 15;
+            SoundOutput.LatencySampleCount    = FramesOfAudioLatency * (SoundOutput.SamplesPerSecond / GameUpdateHz);
 
             Win32InitDSound(Window, SoundOutput.SamplesPerSecond, SoundOutput.SecondaryBufferSize);
             Win32ClearBuffer(&SoundOutput);
@@ -739,6 +814,21 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
             GlobalRunning = true;
             bool32 ControllerFound = false;
+
+            // NOTE(adam): This tests play cursor/write cursor update frequency
+            // Was 480 samples on laptop
+#if 0
+            while (GlobalRunning)
+            {
+                DWORD PlayCursor;
+                DWORD WriteCursor;
+                GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor);
+
+                char MsgBuffer[256];
+                _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "PC: %u WC: %u\n", PlayCursor, WriteCursor);
+                OutputDebugStringA(MsgBuffer);
+            }
+#endif
 
             // TODO(adam): Pool with bitmap virtual alloc
             int16 *Samples = (int16 *)VirtualAlloc(0, SoundOutput.SecondaryBufferSize,
@@ -766,6 +856,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 game_input *OldInput = &Input[1];
 
                 LARGE_INTEGER LastCounter = Win32GetWallClock();
+
+                int DebugTimeMarkerIndex = 0;
+                win32_debug_time_marker DebugTimeMarkers[GameUpdateHz / 2] = {};
+
+                DWORD LastPlayCursor = 0;
+                bool32 SoundIsValid = false;
 
                 uint64 LastCycleCount = __rdtsc();
 
@@ -932,21 +1028,18 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     /*
                      * Get current state of sound buffer
                      */
+                    // NOTE(adam): Compute how much sound to write and where
                     DWORD  ByteToLock   = 0;
                     DWORD  TargetCursor = 0;
                     DWORD  BytesToWrite = 0;
-                    DWORD  PlayCursor   = 0;
-                    DWORD  WriteCursor  = 0;
-                    bool32 SoundIsValid = false;
-                    // TODO(adam): Tighten up sound logic so that we know where we should be
-                    // writing to and can anticipate the time spent in the game update.
-                    if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
+                    if (SoundIsValid)
                     {
                         ByteToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample)
                             % SoundOutput.SecondaryBufferSize;
-                        TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample))
+                        TargetCursor = (LastPlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample))
                             % SoundOutput.SecondaryBufferSize;
 
+                        // TODO(adam): Check this out
                         if (ByteToLock > TargetCursor)
                         {
                             BytesToWrite = SoundOutput.SecondaryBufferSize - ByteToLock;
@@ -956,8 +1049,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         {
                             BytesToWrite = TargetCursor - ByteToLock;
                         }
-
-                        SoundIsValid = true;
+                        char MsgBuffer[256];
+                        _snprintf_s(MsgBuffer, sizeof(MsgBuffer),
+                                    "PC: %u BTL: %u TC: %u BTW: %u\n",
+                                    LastPlayCursor, ByteToLock, TargetCursor, BytesToWrite);
+                        OutputDebugStringA(MsgBuffer);
                     }
 
                     /*
@@ -984,6 +1080,16 @@ int WINAPI wWinMain(HINSTANCE Instance,
                      */
                     if (SoundIsValid)
                     {
+#if HANDMADE_INTERNAL
+                        DWORD PlayCursor;
+                        DWORD WriteCursor;
+                        GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor);
+                        char MsgBuffer[256];
+                        _snprintf_s(MsgBuffer, sizeof(MsgBuffer),
+                                    "LPC: %u BTL: %u TC: %u PC: %u WC: %u\n",
+                                    LastPlayCursor, ByteToLock, TargetCursor, PlayCursor, WriteCursor);
+                        OutputDebugStringA(MsgBuffer);
+#endif
                         Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
                     }
 
@@ -995,8 +1101,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                     // TODO(adam): NOT TESTED YET! PROBABLY BUGGY!!!!!
                     real32 SecondsElapsedForFrame = WorkSecondsElapsed;
+                    char SPFMsgBuffer[256];
+                    _snprintf_s(SPFMsgBuffer, sizeof(SPFMsgBuffer), "BEFORE SLEEP: %.2f\n", 1000.0f * WorkSecondsElapsed);
+                    OutputDebugStringA(SPFMsgBuffer);
                     if (SecondsElapsedForFrame < TargetSecondsPerFrame)
                     {
+                        bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
                         if (SleepIsGranular)
                         {
                             DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
@@ -1004,11 +1114,15 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             {
                                 Sleep(SleepMS);
                             }
+                            timeEndPeriod(DesiredSchedulerMS);
                         }
 
                         // TODO(adam): vvv This is failing at the moment
-                        // real32 TestSecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
-                        // Assert(TestSecondsElapsedForFrame < TargetSecondsPerFrame);
+                        real32 TestSecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+                        // Assert(TestSecondsElapsedForFrame < (TargetSecondsPerFrame + 1e-3));
+                        char MsgBuffer[256];
+                        _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "AFTER SLEEP: %.2f\n", 1000.0f * TestSecondsElapsedForFrame);
+                        OutputDebugStringA(MsgBuffer);
                         while (SecondsElapsedForFrame < TargetSecondsPerFrame)
                         {
                             SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
@@ -1020,26 +1134,63 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         // TODO(adam): Logging
                     }
 
+                    LARGE_INTEGER EndCounter = Win32GetWallClock();
+                    real32 MSPerFrame = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
+                    LastCounter = EndCounter;
+
                     /*
                      * Render frame
                      */
                     win32_window_dimensions Dimension = Win32GetWindowDimensions(Window);
+#if HANDMADE_INTERNAL
+                    Win32DebugSyncDisplay(
+                        &GlobalBackBuffer,
+                        ArrayCount(DebugTimeMarkers),
+                        DebugTimeMarkers,
+                        &SoundOutput,
+                        TargetSecondsPerFrame);
+#endif
                     Win32DisplayBufferInWindow(
                         DeviceContext,
                         &GlobalBackBuffer,
                         Dimension.Width,
                         Dimension.Height);
 
+                    DWORD PlayCursor, WriteCursor;
+                    if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
+                    {
+                        LastPlayCursor = PlayCursor;
+                        if (!SoundIsValid)
+                        {
+                            SoundOutput.RunningSampleIndex = WriteCursor / SoundOutput.BytesPerSample;
+                            SoundIsValid = true;
+                        }
+                    }
+                    else
+                    {
+                        SoundIsValid = false;
+                    }
+
+                    /*
+                     * NOTE(adam): DEBUGGING
+                     */
+#if HANDMADE_INTERNAL
+                    {
+                        win32_debug_time_marker *Marker = &DebugTimeMarkers[DebugTimeMarkerIndex++];
+                        if (DebugTimeMarkerIndex > ArrayCount(DebugTimeMarkers))
+                        {
+                            DebugTimeMarkerIndex = 0;
+                        }
+
+                        Marker->PlayCursor = PlayCursor;
+                        Marker->WriteCursor = WriteCursor;
+                    }
+#endif
 
                     game_input *Temp = NewInput;
                     NewInput = OldInput;
                     OldInput = Temp;
                     // TODO(adam): Should I clear these here?
-
-
-                    LARGE_INTEGER EndCounter = Win32GetWallClock();
-                    real32 MSPerFrame = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
-                    LastCounter = EndCounter;
 
                     uint64 EndCycleCount = __rdtsc();
                     uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
