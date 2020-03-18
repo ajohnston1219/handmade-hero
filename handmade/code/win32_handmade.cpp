@@ -1134,10 +1134,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         // TODO(adam): Logging
                     }
 
-                    LARGE_INTEGER EndCounter = Win32GetWallClock();
-                    real32 MSPerFrame = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
-                    LastCounter = EndCounter;
-
                     /*
                      * Render frame
                      */
@@ -1191,6 +1187,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     NewInput = OldInput;
                     OldInput = Temp;
                     // TODO(adam): Should I clear these here?
+
+
+                    LARGE_INTEGER EndCounter = Win32GetWallClock();
+                    real32 MSPerFrame = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
+                    LastCounter = EndCounter;
 
                     uint64 EndCycleCount = __rdtsc();
                     uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
