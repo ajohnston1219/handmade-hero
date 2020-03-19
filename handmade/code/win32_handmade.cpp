@@ -866,6 +866,8 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                 uint64 LastCycleCount = __rdtsc();
 
+                bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
+
                 /*
                  * Start game loop
                  */
@@ -1174,7 +1176,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     OutputDebugStringA(SPFMsgBuffer);
                     if (SecondsElapsedForFrame < TargetSecondsPerFrame)
                     {
-                        bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
                         if (SleepIsGranular)
                         {
                             DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
@@ -1182,7 +1183,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             {
                                 Sleep(SleepMS);
                             }
-                            timeEndPeriod(DesiredSchedulerMS);
                         }
 
                         // TODO(adam): vvv This is failing at the moment
@@ -1223,6 +1223,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         Dimension.Width,
                         Dimension.Height);
 
+                    {
+                        real32 TestSecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+                        char MsgBuffer[256];
+                        _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "AFTER RENDER: %.2f\n", 1000.0f * TestSecondsElapsedForFrame);
+                        OutputDebugStringA(MsgBuffer);
+                    }
 #if HANDMADE_INTERNAL
                     /*
                      * NOTE(adam): DEBUGGING
@@ -1283,6 +1289,8 @@ int WINAPI wWinMain(HINSTANCE Instance,
     {
         // TODO(adam): Logging
     }
+
+    timeEndPeriod(DesiredSchedulerMS);
 
     return 0;
 }
