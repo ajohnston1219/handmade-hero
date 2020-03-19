@@ -1172,8 +1172,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
                      */
 #if HANDMADE_INTERNAL
                     {
+                        Assert(DebugTimeMarkerIndex < ArrayCount(DebugTimeMarkers));
                         win32_debug_time_marker *Marker = &DebugTimeMarkers[DebugTimeMarkerIndex++];
-                        if (DebugTimeMarkerIndex > ArrayCount(DebugTimeMarkers))
+                        if (DebugTimeMarkerIndex == ArrayCount(DebugTimeMarkers))
                         {
                             DebugTimeMarkerIndex = 0;
                         }
