@@ -171,8 +171,14 @@ struct game_state
 
 internal void GameUpdateAndRender(game_memory              *Memory,
                                   game_input               *Input,
-                                  game_offscreen_buffer    *Buffer,
+                                  game_offscreen_buffer    *Buffer);
+
+// NOTE(adam): At the moment, this has to be a very fast function, it cannot
+// be more than a millisecond or so
+// TODO(adam): Reduce pressure on this function's performance by measuring it
+// or asking about it, etc.
+internal void GameGetSoundSamples(game_memory              *Memory,
                                   game_sound_output_buffer *SoundBuffer);
 
-#define HANDMADE_H
-#endif
+ #define HANDMADE_H
+ #endif

@@ -24,7 +24,7 @@
 
 #include <stdint.h>
 
-#define Pi32 3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342
+#define Pi32 3.1415926535897932384626433
 
 typedef  uint8_t  uint8;
 typedef  uint16_t uint16;
@@ -742,8 +742,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
     LARGE_INTEGER PerfCountFrequencyResult;
     QueryPerformanceFrequency(&PerfCountFrequencyResult);
     GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
-
-    // NOTE(adam): Set the Windows scheduler granularity to 1 ms
+// NOTE(adam): Set the Windows scheduler granularity to 1 ms
     // so that our sleep is more granular
     UINT DesiredSchedulerMS = 1;
 
@@ -764,9 +763,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
     WindowClass.lpszClassName = "HandmadeHeroWindowClass";
 
     // TODO(adam): How do we reliably query this on Windows?
-    // TODO(adam): Consider not syncing audio with frames
-    // TODO(adam): User write cursor delta to adjust target
-    // audio latency
 #define MonitorRefreshHz 60
 #define FramesOfAudioLatency 3
 #define GameUpdateHz (MonitorRefreshHz / 2)
@@ -802,12 +798,15 @@ int WINAPI wWinMain(HINSTANCE Instance,
             // sharing it
             HDC DeviceContext = GetDC(Window);
 
-            win32_sound_output SoundOutput = {};
-            SoundOutput.SamplesPerSecond      = 48000;
-            SoundOutput.BytesPerSample        = sizeof(int16) * 2;
-            SoundOutput.SecondaryBufferSize   = SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample;
-            SoundOutput.LatencySampleCount    = FramesOfAudioLatency * (SoundOutput.SamplesPerSecond / GameUpdateHz);
+            win32_sound_output SoundOutput  = {};
+            SoundOutput.SamplesPerSecond    = 48000;
+            SoundOutput.BytesPerSample      = sizeof(int16) * 2;
+            SoundOutput.SecondaryBufferSize = SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample;
+            // TODO(adam): Actually compute this variance and see what the lowest reasonable value is
+            SoundOutput.SafetyBytes         = ((SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample)
+                                               / GameUpdateHz / 3);
 
+            // TODO(adam): Get rid of latency sample count
             Win32InitDSound(Window, SoundOutput.SamplesPerSecond, SoundOutput.SecondaryBufferSize);
             Win32ClearBuffer(&SoundOutput);
             GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
@@ -860,8 +859,10 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 int DebugTimeMarkerIndex = 0;
                 win32_debug_time_marker DebugTimeMarkers[GameUpdateHz / 2] = {};
 
-                DWORD LastPlayCursor = 0;
+                DWORD AudioLatencyBytes = 0;
+                real32 AudioLatencySeconds =0;
                 bool32 SoundIsValid = false;
+                DWORD LastTargetCursor = 0;
 
                 uint64 LastCycleCount = __rdtsc();
 
@@ -1026,20 +1027,92 @@ int WINAPI wWinMain(HINSTANCE Instance,
                     }
 
                     /*
+                     * Get game state to render
+                     */
+                    // TODO(adam): Sound is wrong now, because we haven't updated it to
+                    // go with the new frame rate.
+                    game_offscreen_buffer Buffer = {};
+                    Buffer.Memory = GlobalBackBuffer.Memory;
+                    Buffer.Width = GlobalBackBuffer.Width;
+                    Buffer.Height = GlobalBackBuffer.Height;
+                    Buffer.Pitch = GlobalBackBuffer.Pitch;
+
+                    GameUpdateAndRender(&GameMemory, NewInput, &Buffer);
+
+                    /*
                      * Get current state of sound buffer
                      */
-                    // NOTE(adam): Compute how much sound to write and where
-                    DWORD  ByteToLock   = 0;
-                    DWORD  TargetCursor = 0;
-                    DWORD  BytesToWrite = 0;
-                    if (SoundIsValid)
+                    DWORD PlayCursor;
+                    DWORD WriteCursor;
+                    if (GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
                     {
-                        ByteToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample)
-                            % SoundOutput.SecondaryBufferSize;
-                        TargetCursor = (LastPlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample))
-                            % SoundOutput.SecondaryBufferSize;
+                        /* NOTE(adam):
+
+                           Here is how sound computation works.
+
+                           We define a safety value that is the number of
+                           samples we think our game update loop may vary
+                           by (let's say up to 2 ms).
+
+                           When we wake up to write audio, we will look
+                           and see what the play cursor position is and
+                           we will forecast ahead where we think the play
+                           cursor will be on the next frame boundary.
+
+                           We will then look to see if the write cursor is before
+                           that. If it is, the target fill position is that frame
+                           boundary pluys one frame. This gives us perfect audio
+                           sync in the cases of a card that has low enough latency.
+
+                           If the write cursor is _after_ that safety margin,
+                           then we will assume we can never sync the audio perfectly,
+                           so we will one frame's worth of audio plus the safety
+                           margin's worth of guard samples.
+                        */
+
+                        if (!SoundIsValid)
+                        {
+                            SoundOutput.RunningSampleIndex = WriteCursor / SoundOutput.BytesPerSample;
+                        }
+
+                        DWORD ByteToLock = ((SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample)
+                                            % SoundOutput.SecondaryBufferSize);
+                        if (SoundIsValid)
+                        {
+                            Assert(ByteToLock == LastTargetCursor);
+                        }
+                        else
+                        {
+                            SoundIsValid = true;
+                        }
+
+                        DWORD ExpectedSoundBytesPerFrame =
+                            (SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample) / GameUpdateHz;
+                        DWORD ExpectedFrameBoundaryByte = PlayCursor + ExpectedSoundBytesPerFrame;
+
+                        DWORD SafeWriteCursor = WriteCursor;
+                        if (SafeWriteCursor < PlayCursor)
+                        {
+                            SafeWriteCursor += SoundOutput.SecondaryBufferSize;
+                        }
+                        Assert(SafeWriteCursor >= PlayCursor);
+                        SafeWriteCursor += SoundOutput.SafetyBytes;
+                        bool32 AudioCardIsLowLatency = (SafeWriteCursor < ExpectedFrameBoundaryByte);
+
+                        DWORD  TargetCursor = 0;
+                        if (AudioCardIsLowLatency)
+                        {
+                            TargetCursor = ExpectedFrameBoundaryByte + ExpectedSoundBytesPerFrame;
+                        }
+                        else
+                        {
+                            TargetCursor = WriteCursor + ExpectedSoundBytesPerFrame + SoundOutput.SafetyBytes;
+                        }
+                        TargetCursor = (TargetCursor & SoundOutput.SecondaryBufferSize);
+                        LastTargetCursor = TargetCursor;
 
                         // TODO(adam): Check this out
+                        DWORD  BytesToWrite = 0;
                         if (ByteToLock > TargetCursor)
                         {
                             BytesToWrite = SoundOutput.SecondaryBufferSize - ByteToLock;
@@ -1049,48 +1122,43 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         {
                             BytesToWrite = TargetCursor - ByteToLock;
                         }
-                        char MsgBuffer[256];
-                        _snprintf_s(MsgBuffer, sizeof(MsgBuffer),
-                                    "PC: %u BTL: %u TC: %u BTW: %u\n",
-                                    LastPlayCursor, ByteToLock, TargetCursor, BytesToWrite);
-                        OutputDebugStringA(MsgBuffer);
-                    }
 
-                    /*
-                     * Get game state to render
-                     */
-                    // TODO(adam): Sound is wrong now, because we haven't updated it to
-                    // go with the new frame rate.
-                    game_sound_output_buffer SoundBuffer = {};
-                    SoundBuffer.SamplesPerSecond = SoundOutput.SamplesPerSecond;
-                    // SoundBuffer.SampleCount = SoundBuffer.SamplesPerSecond / 30; // 30 FPS
-                    SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
-                    SoundBuffer.Samples = Samples;
+                        /*
+                         * Write sound to buffer
+                         */
+                        game_sound_output_buffer SoundBuffer = {};
+                        SoundBuffer.SamplesPerSecond = SoundOutput.SamplesPerSecond;
+                        // SoundBuffer.SampleCount = SoundBuffer.SamplesPerSecond / 30; // 30 FPS
+                        SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
+                        SoundBuffer.Samples = Samples;
+                        GameGetSoundSamples(&GameMemory, &SoundBuffer);
 
-                    game_offscreen_buffer Buffer = {};
-                    Buffer.Memory = GlobalBackBuffer.Memory;
-                    Buffer.Width = GlobalBackBuffer.Width;
-                    Buffer.Height = GlobalBackBuffer.Height;
-                    Buffer.Pitch = GlobalBackBuffer.Pitch;
-
-                    GameUpdateAndRender(&GameMemory, NewInput, &Buffer, &SoundBuffer);
-
-                    /*
-                     * Write sound to buffer
-                     */
-                    if (SoundIsValid)
-                    {
 #if HANDMADE_INTERNAL
                         DWORD PlayCursor;
                         DWORD WriteCursor;
                         GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor);
+
+                        DWORD UnwrappedWriteCursor = WriteCursor;
+                        if (WriteCursor < PlayCursor)
+                        {
+                            UnwrappedWriteCursor += SoundOutput.SecondaryBufferSize;
+                        }
+                        AudioLatencyBytes = UnwrappedWriteCursor - PlayCursor;
+                        AudioLatencySeconds = ((real32)AudioLatencyBytes / (real32)SoundOutput.BytesPerSample
+                                                      / (real32)SoundOutput.SamplesPerSecond);
+
                         char MsgBuffer[256];
                         _snprintf_s(MsgBuffer, sizeof(MsgBuffer),
-                                    "LPC: %u BTL: %u TC: %u PC: %u WC: %u\n",
-                                    LastPlayCursor, ByteToLock, TargetCursor, PlayCursor, WriteCursor);
+                                    "BTL: %u TC: %u PC: %u WC: %u DELTA: %u LOWLAT: %d LAT: %.6f\n",
+                                    ByteToLock, TargetCursor, PlayCursor,
+                                    WriteCursor, AudioLatencyBytes, AudioCardIsLowLatency, AudioLatencySeconds);
                         OutputDebugStringA(MsgBuffer);
 #endif
                         Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
+                    }
+                    else
+                    {
+                        SoundIsValid = false;
                     }
 
                     /*
@@ -1119,7 +1187,10 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                         // TODO(adam): vvv This is failing at the moment
                         real32 TestSecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
-                        // Assert(TestSecondsElapsedForFrame < (TargetSecondsPerFrame + 1e-3));
+                        if (TestSecondsElapsedForFrame < TargetSecondsPerFrame)
+                        {
+                            // TODO(adam): Log missed sleep
+                        }
                         char MsgBuffer[256];
                         _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "AFTER SLEEP: %.2f\n", 1000.0f * TestSecondsElapsedForFrame);
                         OutputDebugStringA(MsgBuffer);
@@ -1152,35 +1223,24 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         Dimension.Width,
                         Dimension.Height);
 
-                    DWORD PlayCursor, WriteCursor;
-                    if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
-                    {
-                        LastPlayCursor = PlayCursor;
-                        if (!SoundIsValid)
-                        {
-                            SoundOutput.RunningSampleIndex = WriteCursor / SoundOutput.BytesPerSample;
-                            SoundIsValid = true;
-                        }
-                    }
-                    else
-                    {
-                        SoundIsValid = false;
-                    }
-
+#if HANDMADE_INTERNAL
                     /*
                      * NOTE(adam): DEBUGGING
                      */
-#if HANDMADE_INTERNAL
                     {
-                        Assert(DebugTimeMarkerIndex < ArrayCount(DebugTimeMarkers));
-                        win32_debug_time_marker *Marker = &DebugTimeMarkers[DebugTimeMarkerIndex++];
-                        if (DebugTimeMarkerIndex == ArrayCount(DebugTimeMarkers))
+                        DWORD PlayCursor, WriteCursor;
+                        if (SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                         {
-                            DebugTimeMarkerIndex = 0;
-                        }
+                            Assert(DebugTimeMarkerIndex < ArrayCount(DebugTimeMarkers));
+                            win32_debug_time_marker *Marker = &DebugTimeMarkers[DebugTimeMarkerIndex++];
+                            if (DebugTimeMarkerIndex == ArrayCount(DebugTimeMarkers))
+                            {
+                                DebugTimeMarkerIndex = 0;
+                            }
 
-                        Marker->PlayCursor = PlayCursor;
-                        Marker->WriteCursor = WriteCursor;
+                            Marker->PlayCursor = PlayCursor;
+                            Marker->WriteCursor = WriteCursor;
+                        }
                     }
 #endif
 
