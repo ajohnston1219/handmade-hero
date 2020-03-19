@@ -23,6 +23,9 @@ struct win32_sound_output
     int    BytesPerSample;
     int    SecondaryBufferSize;
     int    LatencySampleCount;
+    DWORD  SafetyBytes;
+    // TODO(adam): BytesPerSecond
+    // TODO(adam): Should running sample index be in bytes?
 };
 
 struct win32_debug_time_marker
