@@ -764,7 +764,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
     // TODO(adam): How do we reliably query this on Windows?
 #define MonitorRefreshHz 60
-#define FramesOfAudioLatency 3
 #define GameUpdateHz (MonitorRefreshHz / 2)
     real32 TargetSecondsPerFrame = 1.0f / (real32)GameUpdateHz;
 
@@ -862,8 +861,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 DWORD AudioLatencyBytes = 0;
                 real32 AudioLatencySeconds =0;
                 bool32 SoundIsValid = false;
-                DWORD LastTargetCursor = 0;
-
                 uint64 LastCycleCount = __rdtsc();
 
                 bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
@@ -1075,18 +1072,11 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         if (!SoundIsValid)
                         {
                             SoundOutput.RunningSampleIndex = WriteCursor / SoundOutput.BytesPerSample;
+                            SoundIsValid = true;
                         }
 
                         DWORD ByteToLock = ((SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample)
                                             % SoundOutput.SecondaryBufferSize);
-                        if (SoundIsValid)
-                        {
-                            Assert(ByteToLock == LastTargetCursor);
-                        }
-                        else
-                        {
-                            SoundIsValid = true;
-                        }
 
                         DWORD ExpectedSoundBytesPerFrame =
                             (SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample) / GameUpdateHz;
@@ -1110,8 +1100,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         {
                             TargetCursor = WriteCursor + ExpectedSoundBytesPerFrame + SoundOutput.SafetyBytes;
                         }
-                        TargetCursor = (TargetCursor & SoundOutput.SecondaryBufferSize);
-                        LastTargetCursor = TargetCursor;
+                        TargetCursor = (TargetCursor % SoundOutput.SecondaryBufferSize);
 
                         // TODO(adam): Check this out
                         DWORD  BytesToWrite = 0;
@@ -1136,8 +1125,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         GameGetSoundSamples(&GameMemory, &SoundBuffer);
 
 #if HANDMADE_INTERNAL
-                        DWORD PlayCursor;
-                        DWORD WriteCursor;
                         GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor);
 
                         DWORD UnwrappedWriteCursor = WriteCursor;
@@ -1171,9 +1158,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                     // TODO(adam): NOT TESTED YET! PROBABLY BUGGY!!!!!
                     real32 SecondsElapsedForFrame = WorkSecondsElapsed;
-                    char SPFMsgBuffer[256];
-                    _snprintf_s(SPFMsgBuffer, sizeof(SPFMsgBuffer), "BEFORE SLEEP: %.2f\n", 1000.0f * WorkSecondsElapsed);
-                    OutputDebugStringA(SPFMsgBuffer);
                     if (SecondsElapsedForFrame < TargetSecondsPerFrame)
                     {
                         if (SleepIsGranular)
@@ -1191,9 +1175,6 @@ int WINAPI wWinMain(HINSTANCE Instance,
                         {
                             // TODO(adam): Log missed sleep
                         }
-                        char MsgBuffer[256];
-                        _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "AFTER SLEEP: %.2f\n", 1000.0f * TestSecondsElapsedForFrame);
-                        OutputDebugStringA(MsgBuffer);
                         while (SecondsElapsedForFrame < TargetSecondsPerFrame)
                         {
                             SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
