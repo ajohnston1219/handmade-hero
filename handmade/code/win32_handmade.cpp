@@ -739,6 +739,7 @@ internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
 
         DWORD PlayColor = 0xFFFFFFFF;
         DWORD WriteColor = 0xFFFF0000;
+        DWORD ExpectedFlipColor = 0xFFFFFF00;
 
         int Top = PadY;
         int Bottom = PadY + LineHeight;
@@ -746,6 +747,7 @@ internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
         {
             Top += LineHeight + PadY;
             Bottom += LineHeight + PadY;
+            int FirstTop = Top;
 
             Win32DrawSoundBufferMarker(
                 BackBuffer,
@@ -778,6 +780,13 @@ internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
 
             Top += LineHeight + PadY;
             Bottom += LineHeight + PadY;
+
+            Win32DrawSoundBufferMarker(
+                BackBuffer,
+                SoundOutput,
+                C, PadX, FirstTop, Bottom,
+                ThisMarker->ExpectedFlipPlayCursor,
+                ExpectedFlipColor);
         }
 
         Win32DrawSoundBufferMarker(
@@ -921,6 +930,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                 game_input *OldInput = &Input[1];
 
                 LARGE_INTEGER LastCounter = Win32GetWallClock();
+                LARGE_INTEGER FlipWallClock = Win32GetWallClock();
 
                 int DebugTimeMarkerIndex = 0;
                 win32_debug_time_marker DebugTimeMarkers[GameUpdateHz / 2] = {};
@@ -1107,6 +1117,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
 
                         GameUpdateAndRender(&GameMemory, NewInput, &Buffer);
 
+                        LARGE_INTEGER AudioWallClock = Win32GetWallClock();
+                        real32 FromBeginToAudioSeconds = Win32GetSecondsElapsed(FlipWallClock, AudioWallClock);
+
                         /*
                          * Get current state of sound buffer
                          */
@@ -1147,9 +1160,12 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             DWORD ByteToLock = ((SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample)
                                                 % SoundOutput.SecondaryBufferSize);
 
-                            DWORD ExpectedSoundBytesPerFrame =
-                                (SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample) / GameUpdateHz;
-                            DWORD ExpectedFrameBoundaryByte = PlayCursor + ExpectedSoundBytesPerFrame;
+                            DWORD ExpectedSoundBytesPerFrame = ((SoundOutput.SamplesPerSecond * SoundOutput.BytesPerSample)
+                                                                / GameUpdateHz);
+                            real32 SecondsLeftLeftUntilFlip = TargetSecondsPerFrame - FromBeginToAudioSeconds;
+                            DWORD ExpectedBytesUntilFlip = (DWORD)((SecondsLeftLeftUntilFlip / TargetSecondsPerFrame)
+                                                                   * (real32)ExpectedSoundBytesPerFrame);
+                            DWORD ExpectedFrameBoundaryByte = PlayCursor + ExpectedBytesUntilFlip;
 
                             DWORD SafeWriteCursor = WriteCursor;
                             if (SafeWriteCursor < PlayCursor)
@@ -1199,6 +1215,7 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             Marker->OutputWriteCursor = WriteCursor;
                             Marker->OutputLocation = ByteToLock;
                             Marker->OutputByteCount = BytesToWrite;
+                            Marker->ExpectedFlipPlayCursor = ExpectedFrameBoundaryByte;
 
                             DWORD UnwrappedWriteCursor = WriteCursor;
                             if (WriteCursor < PlayCursor)
@@ -1288,6 +1305,9 @@ int WINAPI wWinMain(HINSTANCE Instance,
                             _snprintf_s(MsgBuffer, sizeof(MsgBuffer), "AFTER RENDER: %.2f\n", 1000.0f * TestSecondsElapsedForFrame);
                             OutputDebugStringA(MsgBuffer);
                         }
+
+                        FlipWallClock = Win32GetWallClock();
+
 #if HANDMADE_INTERNAL
                         /*
                          * NOTE(adam): DEBUGGING
