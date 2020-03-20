@@ -740,6 +740,7 @@ internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
         DWORD PlayColor = 0xFFFFFFFF;
         DWORD WriteColor = 0xFFFF0000;
         DWORD ExpectedFlipColor = 0xFFFFFF00;
+        DWORD PlayWindow = 0xFFFF00FF;
 
         int Top = PadY;
         int Bottom = PadY + LineHeight;
@@ -801,6 +802,12 @@ internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
             C, PadX, Top, Bottom,
             ThisMarker->FlipPlayCursor,
             PlayColor);
+        Win32DrawSoundBufferMarker(
+            BackBuffer,
+            SoundOutput,
+            C, PadX, Top, Bottom,
+            ThisMarker->FlipPlayCursor + 480 * SoundOutput->BytesPerSample,
+            PlayWindow);
         Win32DrawSoundBufferMarker(
             BackBuffer,
             SoundOutput,
