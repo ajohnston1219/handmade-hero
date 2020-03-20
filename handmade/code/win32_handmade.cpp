@@ -761,6 +761,12 @@ internal void Win32DebugSyncDisplay(win32_offscreen_buffer  *BackBuffer,
                 C, PadX, Top, Bottom,
                 ThisMarker->OutputWriteCursor,
                 WriteColor);
+            Win32DrawSoundBufferMarker(
+                BackBuffer,
+                SoundOutput,
+                C, PadX, Top, Bottom,
+                ThisMarker->ExpectedFlipPlayCursor,
+                ExpectedFlipColor);
 
             Top += LineHeight + PadY;
             Bottom += LineHeight + PadY;
